@@ -1,0 +1,165 @@
+---
+title: "modis_download"
+author: "Patrick D. lorch"
+date: "2022-12-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Using MODISTools
+
+
+```{r installload}
+# install.packages("MODISTools")
+
+library(MODISTools)
+library(raster)
+library(sf)
+library(leaflet)
+
+```
+
+## Examples from MODISTools vignette
+
+https://cran.r-project.org/web/packages/MODISTools/vignettes/modistools-vignette.html
+
+Values in the land cover download do not match any legend I can find.
+(e.g., here: https://lpdaac.usgs.gov/documents/101/MCD12_User_Guide_V6.pdf or https://developers.google.com/earth-engine/datasets/catalog/MODIS_006_MCD12Q1#bands)
+
+```{r example}
+# This should be the right legend, but is not.
+lccs1_legend = read.csv("MODIS_MCD12Q1_LC_Prop1_legend.csv")
+
+products <- mt_products()
+View(products)
+products[grep("NDVI", products$description),]
+bands <- mt_bands(product = "MOD13Q1")
+View(bands)
+dates <- mt_dates(product = "MOD13Q1", lat = 32, lon = -114)
+View(dates)
+
+products[grep("LC", products$description),]
+bands_LC <- mt_bands(product = "MCD12Q1")
+View(bands_LC)
+dates_LC <- mt_dates(product = "MCD12Q1", lat = 32, lon = -114)
+View(dates_LC)
+
+
+# get some example points
+testpoints = pt11 %>%
+  dplyr::select(loccode, point_id, easting, northing) %>%
+  dplyr::slice(1:10)
+
+testpoints_sf = st_as_sf(testpoints, coords = c("easting", "northing"), crs = 6340)
+View(testpoints_sf)
+plot(st_geometry(testpoints_sf))
+tp_4326 = st_transform(testpoints_sf, crs = 4326)
+# Another way
+# Transforming the data
+# NDVI_raster <- projectRaster(NDVI_raster, crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+
+tp_df = sfheaders::sf_to_df(tp_4326)
+names(tp_df)[3:4] = c("lon", "lat")
+
+# Find date of overflight for use in subsets below
+dates08 = mt_dates(product = "MOD13Q1", lat = tp_df$lat[1], lon = tp_df$lon[1])
+dates08[lubridate::year(dates08$calendar_date)==2008,]
+
+subsets <- mt_batch_subset(df = tp_df,
+                     product = "MOD13Q1",
+                     band = "250m_16_days_NDVI",
+                     km_lr = 0.7,
+                     km_ab = 0.7,
+                     start = "2008-06-09",
+                     end = "2008-06-09",
+                     internal = TRUE)
+
+tp_r = mt_to_raster(subsets, reproject = T)
+
+plot(tp_r)
+plot(st_geometry(tp_4326), add = T)
+
+# Find date of overflight for use in subsets below
+dates08_lc = mt_dates(product = "MCD12Q1", lat = tp_df$lat[1], lon = tp_df$lon[1])
+dates08_lc[lubridate::year(dates08_lc$calendar_date)==2008,]
+
+subsets_lc <- mt_batch_subset(df = tp_df,
+                     product = "MCD12Q1",
+                     band = "LC_Type1",
+                     km_lr = 0.7,
+                     km_ab = 0.7,
+                     start = "2008-01-01",
+                     end = "2008-01-01",
+                     internal = TRUE)
+
+tp_r_lc = mt_to_raster(subsets_lc, reproject = T)
+
+subsets_lc <- mt_batch_subset(df = tp_df,
+                     product = "MCD12Q1",
+                     band = "LC_Prop1",
+                     km_lr = 0.7,
+                     km_ab = 0.7,
+                     start = "2008-01-01",
+                     end = "2008-01-01",
+                     internal = TRUE)
+
+tp_r_lc = mt_to_raster(subsets_lc, reproject = T)
+
+plot(tp_r_lc)
+text(tp_r_lc)
+# tp_r_lc@legend
+plot(st_geometry(tp_4326), add = T)
+
+```
+
+## Some better plots
+
+### Leaflet
+
+From here:
+https://rspatialdata.github.io/vegetation.html
+
+```{r leaflet}
+label_ndvi = "NDVI"
+tp_r_ndvi = mt_to_raster(subsets, reproject = T)
+
+label_lc = "Land Cover Class"
+tp_r_lc = mt_to_raster(subsets_lc, reproject = T)
+
+# Not sure I want this: "Dividing values by 10000 to have NDVI values between -1 and 1"
+# gain(tp_r) <- 0.0001
+
+# Defining color palette
+pal_ndvi <- colorNumeric(c("#440154FF", "#238A8DFF", "#FDE725FF"), values(tp_r_ndvi), na.color = "transparent")
+pal_lc <- colorNumeric(c("#440154FF", "#238A8DFF", "#FDE725FF"), values(tp_r_lc), na.color = "transparent")
+
+# Visualising using leaflet
+leaflet() %>%
+  addTiles() %>%
+  addRasterImage(tp_r_ndvi, colors = pal_ndvi, opacity = 0.75, group = label_ndvi) %>%
+  addRasterImage(tp_r_lc, colors = pal_lc, opacity = 0.75, group = label_lc) %>%
+  addLegend(
+    pal = pal_ndvi, values = values(tp_r_ndvi),
+    title = label_ndvi
+  )  %>% 
+  addLegend(
+    pal = pal_lc, values = values(tp_r_lc),
+    title = label_lc
+  )  %>% 
+  addProviderTiles("OpenStreetMap.Mapnik", group = "OpenStreetMap") %>%
+  addProviderTiles("Esri.WorldImagery", group = "ESRI World Imagery") %>%
+  addProviderTiles("Esri.WorldTopoMap", group = "ESRI World Topo") %>%
+  addLayersControl(
+    baseGroups = c("OpenStreetMap", "ESRI World Imagery", "ESRI World Topo"),
+    overlayGroups = c(label_ndvi, label_lc),
+    options = layersControlOptions(collapsed = FALSE,),
+    position = "bottomleft"
+  )
+
+   
+```
+
+
