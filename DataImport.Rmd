@@ -116,6 +116,7 @@ writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2022,
 To help interpret datasets from different years, here is what I understand.
 
 * 2008-2014 paper forms and GPS
+  * 2012 was a fully normalized database that John set up in MySQL?
 * 2014-2018 Trimble Junos (2014 entered into Junos?)
 * 2019-2021 Arc Collector on phones and tablets.
 * 2022 Arc Field Maps on phones and tablets.
@@ -128,12 +129,7 @@ To help interpret datasets from different years, here is what I understand.
 First bring data in from tables in postgis database.
 
 ```{r connect}
-dsn_database = "postgis_32_ssrs"   # Specify the name of your Database
-# Specify host name e.g.:"aws-us-east-1-portal.4.dblayer.com"
-dsn_hostname = "localhost"  
-dsn_port = "5432"                # Specify your port number. e.g. 5432
-dsn_uid = "postgres"         # Specify your username. e.g. "postgres" or "admin"
-dsn_pwd = "IpDesh?6"        # Specify your password. e.g. "NEEDTOFILLIN"
+load(connect.R)
 
 tryCatch({
     # drv <- dbDriver("PostgreSQL")
