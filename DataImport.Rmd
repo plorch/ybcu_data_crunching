@@ -18,11 +18,20 @@ library(RPostgres)
 library(dplyr)
 library(tidyr)
 library(rgdal)
+library(sp)
 # library(sf)
 library(unmarked)
 ```
 
+## Background
 
+* C1507 - (Beal) SSRS only surveyed in 2019, Reclamation covered remaining years. 
+* C1801 - (Planet Ranch) SSRS surveyed it 2020 and 2022, Reclamation covered it in 2019. 
+* C1906 - (Cougar Point) only one survey conducted in 2019 which showed it was no longer suitable YBCU habitat and was not surveyed again. I haven't been including this site in the summary report as a result. 
+* C1936 - Gibraltar Rock, it was not surveyed 2020-2022 due to lack of suitable habitat
+* C1938 - (Sandy Wash) only one survey conducted in 2021 before fire destroyed the habitat, no surveys conducted there for remainder of contract. 
+* C2748 - (Eastside) Site was surveyed in 2021 but the section code did not exist. It was surveyed as part of C2741 survey and the data was later extracted for reporting purposes. I could manually relabel the survey/visit/point keys for the 2021 Eastside data if you'd like, it's only a like 2-5 survey points per survey. 
+* C4963 - (LDCA Reach 2) Surveyed by two surveyors in 2019, split into Reach 2 North (C4967) and Reach 2 South (C4968) for 2020-2022. 
 
 ## Data import
 
@@ -55,7 +64,15 @@ Uses rgdal::readOGR or read.csv to bring in data from shapefiles
 dsn21 = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2021/Data/2021 Shapefiles"
 lcr_ybcu_survey_points_spdf_2021 = readOGR(dsn = dsn21, layer = "Survey Point")
 proj4string(lcr_ybcu_survey_points_spdf_2021)
-coordinates(lcr_ybcu_survey_points_spdf_2021)
+sp::coordinates(lcr_ybcu_survey_points_spdf_2021)
+
+dsn21a = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2021/Data/Shapefiles edited to include C2748"
+lcr_ybcu_survey_points_spdf_2021a = readOGR(dsn = dsn21a, layer = "SurveyPoint2021")
+proj4string(lcr_ybcu_survey_points_spdf_2021a)
+sp::coordinates(lcr_ybcu_survey_points_spdf_2021a)
+lcr_ybcu_detections_spdf_2021a = readOGR(dsn = dsn21a, layer = "Detection2021")
+proj4string(lcr_ybcu_detections_spdf_2021a)
+sp::coordinates(lcr_ybcu_detections_spdf_2021a)
 
 dsn20 = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2020/Data/2020 Shapefiles"
 lcr_ybcu_survey_points_spdf_2020 = readOGR(dsn = dsn20, layer = "SurPoint")
@@ -64,7 +81,7 @@ proj4string(lcr_ybcu_survey_points_spdf_2020)
 
 dsn19 = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2019/Data/2019 Shapefiles"
 lcr_ybcu_survey_points_spdf_2019 = readOGR(dsn = dsn19, layer = "surveypoint2019")
-class(proj4string(lcr_ybcu_survey_points_spdf_2019))
+proj4string(lcr_ybcu_survey_points_spdf_2019)
 
 lcr_ybcu_survey_points_spdf_2022 <- read.csv("C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2022/.csv files/Survey Point.csv")
 coordinates(lcr_ybcu_survey_points_spdf_2022) = ~x + y
@@ -94,6 +111,22 @@ lcr_ybcu_survey_points_spdf_UTM11_2021$x =
 lcr_ybcu_survey_points_spdf_UTM11_2021$y =
   coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021)[,2]
 
+lcr_ybcu_survey_points_spdf_UTM11_2021a = 
+  spTransform(lcr_ybcu_survey_points_spdf_2021a, 
+              CRS(proj4string(lcr_ybcu_survey_points_spdf_2019)))
+lcr_ybcu_survey_points_spdf_UTM11_2021a$x =
+  sp::coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021a)[,1]
+lcr_ybcu_survey_points_spdf_UTM11_2021a$y =
+  sp::coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021a)[,2]
+
+lcr_ybcu_detections_spdf_UTM11_2021a = 
+  spTransform(lcr_ybcu_detections_spdf_2021a, 
+              CRS(proj4string(lcr_ybcu_survey_points_spdf_2019)))
+lcr_ybcu_detections_spdf_UTM11_2021a$x =
+  sp::coordinates(lcr_ybcu_detections_spdf_UTM11_2021a)[,1]
+lcr_ybcu_detections_spdf_UTM11_2021a$y =
+  sp::coordinates(lcr_ybcu_detections_spdf_UTM11_2021a)[,2]
+
 writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2020,
          dsn = "stuff",
          layer = "survey_points_2020_UTM11N",
@@ -102,6 +135,14 @@ writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2021,
          dsn = "stuff2",
          layer = "survey_points_2021_UTM11N",
          driver = "CSV")
+writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2021a,
+         dsn = "stuff2a",
+         layer = "survey_points_2021a_UTM11N",
+         driver = "CSV")
+writeOGR(lcr_ybcu_detections_spdf_UTM11_2021a,
+         dsn = "stuff2b",
+         layer = "detections_2021a_UTM11N",
+         driver = "CSV")
 writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2022,
          dsn = "stuff3",
          layer = "survey_points_2022_UTM11N",
@@ -109,7 +150,7 @@ writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2022,
 
 ```
 
-## Combine survey point data across years
+## Import survey point data for all years
 
 ### Data gathering notes
 
@@ -129,7 +170,7 @@ To help interpret datasets from different years, here is what I understand.
 First bring data in from tables in postgis database.
 
 ```{r connect}
-load(connect.R)
+source("connect.R")
 
 tryCatch({
     # drv <- dbDriver("PostgreSQL")
@@ -159,7 +200,7 @@ points13 = dbReadTable(connec, "points13")
 points1418 = dbReadTable(connec, "points1418")
 points19 = dbReadTable(connec, "points19")
 points20 = dbReadTable(connec, "points20")
-points21 = dbReadTable(connec, "points21")
+points21 = dbReadTable(connec, "points2021a")
 points22 = dbReadTable(connec, "points22")
 
 surveys1418 = dbReadTable(connec, "surveys1418")
@@ -174,7 +215,7 @@ surveys08 = dbReadTable(connec, "surveys08")
 
 detections19 = dbReadTable(connec, "detections19")
 detections20 = dbReadTable(connec, "detections20")
-detections21 = dbReadTable(connec, "detections21")
+detections21 = dbReadTable(connec, "detections2021a")
 detections22 = dbReadTable(connec, "detections22")
 
 dbDisconnect(conn = connec)
@@ -229,6 +270,7 @@ svdet1418 = surveydetections1418 %>%
   mutate(detection_key = paste(contractor_folder, sur_pt, sep="_")) %>%
   # arrange(detection_key, ybcu_nu)
   count(detection_key, det_ty, name = "det_count")
+
 # Count the new detections.  We can then filter by this greater than 0 to remove repeat detections
 svdetN1418 = surveydetections1418 %>% 
   select("sur_pt", "det_ty", "ybcu_nu", "contractor_folder") %>%
@@ -323,33 +365,39 @@ pt13_distinct = pt13 %>% distinct(detection_key, .keep_all = T)
 ```
 
 
-### 2012 (no count yet)
+### 2012
 
 For some reason, just this year, the database was mostly normalized. This may be the year John Stanek set up an online MySQL database for data entry.
 
 ***pd_ybcu_detection_number is not a count.  It may be a sequential number. I think we still need to count the detections at a point.***
 
-It is not clear how multiple detections at a point were handled.  
-
-Is it possible that surveyors just created a new point for each detection, even if it was at the same point?
+A new point was recorded for each detection at a location.  This means that point_id is unique for each detection, so it cannot be used to count detections at one location.
 
 It looks like something like survey_id, gps_number, and point_gps_waypt may be able to be used as unique identifier.  Is this the best we can do? This will not work perfectly as some surveyors added letters to one number for gps waypoint for the same coordinates.
 
+The pointdetection table is duplicated in the database I was given. I removed the duplicates.
+
+We have counts for now, but they are likely lumping some locations that in other years would not be lumped.
 
 ```{r combine12}
 names(points12)
 # This year they only recorded detection/no detection in points 
-# Number needs to be pulled out of the pointdetection table
-# Date needs to be pulled out of the survey12 table
-# Cicada data recorded also must be pulled in
+# Number needs to be pulled out of the pointdetection table.
+# Date needs to be pulled out of the survey12 table.
+# Cicada data recorded also must be pulled in.
 # There is pointdetection type (Survey and Incidental), and detection type
-#   but not whether it is New or a Repeat
+#   but not whether it is New or a Repeat.
+
+# Remove duplicate rows
+pointdetection12 = pointdetection12[!duplicated(pointdetection12),]
+
 pt12 = points12 %>%
-  select("point_id", "survey_id", "point_easting", "point_start_time", 
-         "point_northing", "point_broadcast_plays", 
+  select("point_id", "survey_id", "gps_number", "point_start_time",
+         "point_gps_waypt", "point_easting", "point_northing",
+         "habitat_type", "structure_type", "point_broadcast_plays", 
          "point_ybcu_detected_yn", "point_note") %>%
-  left_join(select(surveys12, "survey_id", "site_code", "survey_date", 
-                   "survey_all_surveyors")) %>%
+  left_join(select(surveys12, "survey_id", "site_code", "visit_type",
+                   "survey_date","survey_all_surveyors")) %>%
   left_join(select(pointdetection12, "point_id", "ptdetection_type",
                    "pd_ybcu_detection_number")) %>%
   left_join(select(surveypoint12, "point_id", "cicada_code")) %>%
@@ -366,9 +414,69 @@ pt12 = points12 %>%
 # Still need to convert svpointtime from character to time to match weird times of other years
 pt12$svpointtime = strptime(paste0("1899-12-30 ", pt12$svpointtime), "%Y-%m-%d %H:%M")
 
+# This does not count at points but just survey_id by gps_number combos with S for ptdetection_type
+#   This undoubtedly lumps some points together yielding higher counts
+pt12_det = pt12 %>% select(survey_id, gps_number, point_id,
+                           survey_all_surveyors, ybcudetection,
+                           ptdetection_type, ybcudetectioncount) %>% 
+  # filter(ybcudetection == 1)%>%
+  arrange(survey_id, gps_number, ybcudetectioncount) 
+
+pt12_det_count = pt12_det %>%
+  count(survey_id, gps_number, wt = (ptdetection_type == "S"), name = "det_count")
 table(pt12_det_count$det_count)
 
+pt12 = pt12 %>% left_join(pt12_det_count)
+
+pt12_distinct = pt12 %>% distinct(survey_id, gps_number, .keep_all = T)
+  
 ```
+
+#### Find close points
+
+This is a boondoggle.  But the plot is a nice tool.
+
+```{r closeones}
+library(sf)
+library(nngeo)
+library(leaflet)
+
+pt12_sf = pt12 %>% st_as_sf(coords = c("easting", "northing"), crs = 6340)
+pt12_sf_4326 = pt12_sf %>% st_transform(crs = 4326)
+
+pal <- colorNumeric(
+  palette = "magma",
+  domain = pt12_sf_4326$ybcudetection,
+  na.color = "#737373")
+
+leaflet(pt12_sf_4326) %>%
+  addTiles(group = "OSM (default)") %>%
+  addProviderTiles('Esri.WorldImagery',group = "Esri World Imagery") %>%
+  addCircleMarkers(
+    color =  pal(pt12_sf_4326$ybcudetection),
+    clusterOptions = markerClusterOptions(),
+    popup = ~paste(as.character(survey_id),
+                   as.character(gps_number),
+                   as.character(point_id),
+                   sep = "; "),
+    label = ~as.character(survey_id),
+    labelOptions = labelOptions(permanent = T)
+  ) %>%
+  addLayersControl(
+        baseGroups = c("OSM (default)", "Esri World Imagery"),
+        position = "bottomright",
+        options = layersControlOptions(collapsed = TRUE)) %>%
+  addLegend(pal = pal, values = pt12_sf_4326$ybcudetection) %>%
+  addScaleBar(
+    position = c("bottomleft"),
+    options = scaleBarOptions()
+  )
+
+# Not clear how to use these distances to build groups
+pt12_sf[1:40,] %>% group_by(survey_id) %>% st_nn(., ., k=2, returnDist = T)
+   
+```
+
 
 ### 2011
 
@@ -582,7 +690,7 @@ Survey period and visit number sometimes align, but sometimes do not.  For the y
 
 ***Errors:***
 
-* 1 test row with no key. These are removed on input.
+* 1 test row with no key. This is removed on input.
 * FY19-YBC-C2362-SUR-V2-P07 and FY19-YBC-C2368-FOL-V16-P02 Only coordinates and time differ.
 * FY19-YBC-C2368-SUR-V4-P02 One entry may have wrong key. Point.Number is 1 not 2
 * FY19-YBC-C2546-SUR-V1-P09 One entry has wrong key.  vthorpe change point from 9 to 10.
@@ -652,11 +760,6 @@ pt19 = points19_wfixes %>%
                                   by = c("Cicada.Count" = "cicada_cat")) %>%
   left_join(pt19_det_count, by = "Point.Key") %>%
   mutate(det_count = replace_na(det_count, 0))
-# These could be removed
-#   1324 is not clear what to do
-# pt19 = pt19[-c(1324),]
-
-
 
 ```
 
@@ -664,9 +767,20 @@ pt19 = points19_wfixes %>%
 
 Survey point time was not recorded.
 
+Problems:
+
+* There is row in the summary that has NA for survey site.  
+  * Looks like it should be 2365 survey period 2, based on ins point key and date
+* A test row needs to be deleted
+
 ```{r combine20}
 names(points20)
 
+points20_wfixes = points20 %>% 
+  slice(which(objectid != "110")) %>%
+  mutate(survey_key = if_else(objectid == "857",
+                              "FY20-YBC-C2365", survey_key))
+  
 svdet20 = detections20 %>%
   filter(Visit.type == "Survey", New.bird. == "Yes") %>%
   select(Point.key, Survey.period, YBCU.number) %>%
@@ -675,7 +789,7 @@ pt20_det_count = svdet20 %>%
   count(Point.key, name = "det_count")
 
 # Removing row which is test row
-pt20 = points20[-1,] %>%
+pt20 = points20_wfixes %>%
   select("survey_key", 'point_key', "survey_per", "point_num", "cicada_cnt", 
          "play_cnt", "ybcu_detec", "notes", "date_coll", 
          "x", "y") %>%
@@ -702,15 +816,17 @@ pt20[713,]
 
 ```{r combine21}
 names(points21)
+names(detections21)
 
 svdet21 = detections21 %>%
-  filter(Visit.type == "Survey", New.bird. == "Yes") %>%
-  select(Point.key, Survey.period, YBCU.number) %>%
-  arrange(Survey.period, Point.key, YBCU.number) 
+  filter(visit_type == "Sur", new_bird == "Yes") %>%
+  select(point_key, survey_per, ybcu_num) %>%
+  arrange(survey_per, point_key, ybcu_num) 
 pt21_det_count = svdet21 %>%
-  count(Point.key, name = "det_count")
+  count(point_key, name = "det_count")
 
 pt21 = points21 %>%
+  slice(which(survey_per != "0")) %>%
   select("survey_key", "point_key", "survey_per", "point_num", "cicada_cnt", 
          "play_cnt", "ybcu_detec", "notes", "date_coll", 
          "x", "y") %>%
@@ -728,7 +844,7 @@ pt21 = points21 %>%
          
   left_join(select(cicada12, cicada_index = cicada_code, cicada_cat),
                                   by = c("cicada_cnt" = "cicada_cat")) %>%
-  left_join(pt21_det_count, by = c("point_key" = "Point.key")) %>%
+  left_join(pt21_det_count, by = c("point_key" = "point_key")) %>%
   mutate(det_count = replace_na(det_count, 0))
 pt21[c(197, 299, 303),]
 
@@ -740,6 +856,13 @@ pt21[c(197, 299, 303),]
 ```{r combine22}
 names(points22)
 
+points22_wfixes = points22 %>% 
+  slice(-c(1232, 1234)) %>%
+  mutate(Survey.period = if_else(Visit.key == "FY22-YBC-C1507-Sur-V3",
+                              "3", Survey.period)) %>%
+  mutate(Survey.period = if_else(Visit.key == "FY22-YBC-C1507-Sur-V4",
+                              "4", Survey.period))
+
 svdet22 = detections22 %>%
   filter(Visit.type == "Survey", New.bird. == "Yes") %>%
   select(Point.key, Survey.period, YBCU.number) %>%
@@ -747,10 +870,10 @@ svdet22 = detections22 %>%
 pt22_det_count = svdet22 %>%
   count(Point.key, name = "det_count")
 
-pt22 = points22 %>%
-  select("Survey.key", "Point.key", "Survey.period", "Point.number", "Cicada.count", 
-         "Play.count", "YBCU.detected.", "notes", "Date.Collected", 
-         "x11e", "y11n") %>%
+pt22 = points22_wfixes %>%
+  select("Survey.key", "Point.key", "Survey.period", "Point.number",
+         "Cicada.count", "Play.count", "YBCU.detected.", "notes",
+         "Date.Collected", "x11e", "y11n") %>%
   rename(svperiod = "Survey.period", 
          numberofplaybacks = "Play.count", 
          ybcudetection = "YBCU.detected.", 
@@ -791,8 +914,12 @@ Ideally, we get a site level summary of detection for multiple years, then combi
 
 Year would then be the primary sampling period and survey period the secondary for dynamic occupancy models.
 
+I have added survey_duration_approx which is the min and max time for points in a site/section.
+
 ***Errors***
 When you run the summary the first time with date in group_by(), the following errors are found.
+
+#### 2019
 
 I have gone back to where I imported points19 to fix these in points19 (code block combine19) so the changes carry through.
 
@@ -813,14 +940,67 @@ I have gone back to where I imported points19 to fix these in points19 (code blo
   * Removed: The other one does not fit nicely anywhere obvious
   
 
-```{r unmarked}
+```{r sitesum19}
 # Calculate most common item in categorical variable
-Mode <- function(x) {
-  ux <- unique(x)
+Mode = function(x) {
+  ux = unique(x)
   ux[which.max(tabulate(match(x, ux)))]
 }
 
+Scale = function(x) {
+  (x - mean(x, na.rm = T)) / sd(x, na.rm = T)
+}
+
+# Using svpointdate in the group_by will catch problems in data that need to be sorted out
 pt19_sum_site = pt19 %>%
+  group_by(loccode1922, svperiod, svpointdate) %>%
+  summarise(points_surveyed = n(),
+            playbacks_sum = sum(as.numeric(numberofplaybacks)),
+            det_count = sum(as.numeric(det_count)),
+            survey_date = first(as.Date(svpointdate)),
+            survey_duration_approx = as.numeric(
+              max(as.POSIXct(svpointtime, format = "%m/%d/%Y, %I:%M %p")) - 
+              min(as.POSIXct(svpointtime, format = "%m/%d/%Y, %I:%M %p")),
+              units = "secs"),
+            mean_easting = mean(as.numeric(easting)),
+            mean_northing = mean(as.numeric(northing)),
+            cicada_class = Mode(cicada_index))
+
+table(pt19_sum_site$loccode1922, pt19_sum_site$svperiod)
+# This shows that survey period will probably matter
+table(pt19_sum_site$svperiod, pt19_sum_site$det_count)
+
+pt19_sitebysvperiod = pt19_sum_site %>% 
+  select(svperiod, det_count, loccode1922) %>%
+  pivot_wider(names_from = svperiod, values_from = det_count) %>%
+  tibble::column_to_rownames("loccode1922")
+
+pt19_effort_time = pt19_sum_site %>%
+  select(svperiod, survey_duration_approx, loccode1922) %>%
+  # mutate(effort_time = Scale(survey_duration_approx)) %>%
+  pivot_wider(names_from = svperiod, values_from = survey_duration_approx) 
+
+pt19_effort_time_scaled = pt19_effort_time %>%
+  select(-1) %>%
+  tibble::column_to_rownames("loccode1922") %>%
+  scale()
+
+
+
+
+```
+
+#### 2020
+I have gone back to where I imported points20 to fix these in points20 (code block combine20) so the changes carry through.
+
+Problems:
+
+* There is row in the summary that has NA for survey site.  
+  * Done: Looks like it should be 2365 survey period 2 based on point_key and date
+* Done: Remove blank test row
+
+```{r sitesum20}
+pt20_sum_site = pt20 %>%
   group_by(loccode1922, svperiod, svpointdate) %>%
   summarise(points_surveyed = n(),
             playbacks_sum = sum(as.numeric(numberofplaybacks)),
@@ -830,12 +1010,160 @@ pt19_sum_site = pt19 %>%
             mean_northing = mean(as.numeric(northing)),
             cicada_class = Mode(cicada_index))
 
-# This shows that survey period will probably matter
-table(pt19_sum_site$svperiod, pt19_sum_site$det_count)
+table(pt20_sum_site$loccode1922, pt20_sum_site$svperiod)
+table(pt20_sum_site$svperiod, pt20_sum_site$det_count)
 
-pt19_sitebysvperiod = pt19_sum_site %>% 
+
+pt20_sitebysvperiod = pt20_sum_site %>% 
   select(svperiod, det_count, loccode1922) %>%
-  pivot_wider(names_from = svperiod, values_from = det_count)
+  pivot_wider(names_from = svperiod, values_from = det_count) %>%
+  tibble::column_to_rownames("loccode1922")
+
+```
+
+#### 2021
+I have gone back to where I imported points21 to fix these in points21 (code block combine21) so the changes carry through.
+
+Problems:
+
+* Three rows with NA for loccode1922
+  * Done: Removed all with survey period == 0
+```{r sitesum21}
+pt21_sum_site = pt21 %>%
+  group_by(loccode1922, svperiod, svpointdate) %>%
+  summarise(points_surveyed = n(),
+            playbacks_sum = sum(as.numeric(numberofplaybacks)),
+            det_count = sum(as.numeric(det_count)),
+            survey_date = first(as.Date(svpointdate)),
+            mean_easting = mean(as.numeric(easting)),
+            mean_northing = mean(as.numeric(northing)),
+            cicada_class = Mode(cicada_index))
+
+table(pt21_sum_site$loccode1922, pt21_sum_site$svperiod)
+table(pt21_sum_site$svperiod, pt21_sum_site$det_count)
+
+
+pt21_sitebysvperiod = pt21_sum_site %>% 
+  select(svperiod, det_count, loccode1922) %>%
+  pivot_wider(names_from = svperiod, values_from = det_count) %>%
+  tibble::column_to_rownames("loccode1922")
+
+```
+
+#### 2022
+I have gone back to where I imported points21 to fix these in points21 (code block combine21) so the changes carry through.
+
+Problems:
+
+* two rows with NA for loccode1922
+  * Done: Should be deleted
+* One record with C1507 on 2022-07-20 is marked as period 2
+  * Done: should be changed to period 3
+* One record with C1507 on 2022-08-03 is marked as period 3
+  * Done: should be changed to period 4
+
+```{r sitesum22}
+pt22_sum_site = pt22 %>%
+  group_by(loccode1922, svperiod, svpointdate) %>%
+  summarise(points_surveyed = n(),
+            playbacks_sum = sum(as.numeric(numberofplaybacks)),
+            det_count = sum(as.numeric(det_count)),
+            survey_date = first(as.Date(svpointdate)),
+            mean_easting = mean(as.numeric(easting)),
+            mean_northing = mean(as.numeric(northing)),
+            cicada_class = Mode(cicada_index))
+
+table(pt22_sum_site$loccode1922, pt22_sum_site$svperiod)
+table(pt22_sum_site$svperiod, pt22_sum_site$det_count)
+
+
+pt22_sitebysvperiod = pt22_sum_site %>% 
+  select(svperiod, det_count, loccode1922) %>%
+  pivot_wider(names_from = svperiod, values_from = det_count) %>%
+  tibble::column_to_rownames("loccode1922")
+
+```
+
+#### Sites by Years comparison
+
+```{r sitenames}
+sites1922 = unique(c(row.names(pt19_sitebysvperiod),
+      row.names(pt20_sitebysvperiod),
+      row.names(pt21_sitebysvperiod),
+      row.names(pt22_sitebysvperiod)))
+
+sites1922.df = rbind(data.frame(Year = 2019, 
+                                Site = row.names(pt19_sitebysvperiod)),
+                     data.frame(Year = 2020, 
+                                Site = row.names(pt20_sitebysvperiod)),
+                     data.frame(Year = 2021, 
+                                Site = row.names(pt21_sitebysvperiod)),
+                     data.frame(Year = 2022, 
+                                Site = row.names(pt22_sitebysvperiod)))
+
+sites1922.wide.df = sites1922.df %>%
+  group_by(Site, Year) %>%
+  summarise(n = n()) %>%
+  pivot_wider(names_from = Year, values_from = n)
+
+sites1922.tab = table(sites1922.df$Site, sites1922.df$Year)
+```
+
+### Combine years by site
+
+```{r combineyears}
+pt19_sbsp = pt19_sitebysvperiod %>%
+  tibble::rownames_to_column("loccode1922")
+pt20_sbsp = pt20_sitebysvperiod %>%
+  tibble::rownames_to_column("loccode1922")
+pt21_sbsp = pt21_sitebysvperiod %>%
+  tibble::rownames_to_column("loccode1922")
+pt22_sbsp = pt22_sitebysvperiod %>%
+  tibble::rownames_to_column("loccode1922")
+  
+count1922_sitebysvperiod_list = 
+  list(pt19_sbsp,
+       pt20_sbsp,
+       pt21_sbsp,
+       pt22_sbsp)
+
+count1922_sitebysvperiod_lj =  
+count1922_sitebysvperiod_list %>%
+  Reduce(function(df1, df2)
+    left_join(df1, df2, by = "loccode1922"), .)
+
+svperiodnames1922 =
+  names(count1922_sitebysvperiod_lj)[-1] %>%
+  as_data_frame() %>%
+  separate(value, c("Period", NA, NA)) %>%
+  mutate(Period2 = paste0(Period, 
+                          c(rep(".2019", 4),
+                            rep(".2020", 4),
+                            rep(".2021", 4),
+                            rep(".2022", 4)))
+  )
+
+  names(count1922_sitebysvperiod_lj)[-1] = 
+    as.character(svperiodnames1922$Period2)
+
+
+write.csv(count1922_sitebysvperiod_lj,
+          "count1922.csv",
+          row.names = F)
+
+# Split off sites
+names_count1922 = 
+  count1922_sitebysvperiod_lj %>%
+  select("loccode1922")
+cs =
+  as.data.frame(count1922_sitebysvperiod_lj) %>%
+  select(-"loccode1922")
+# convert to presence absence
+cs[cs > 0] = 1
+# Add sites back on
+presabs1922_sitesbyperiod =
+  data.frame(names_count1922, cs)
+rm(cs)
 
 ```
 
