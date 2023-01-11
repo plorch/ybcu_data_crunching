@@ -19,7 +19,7 @@ library(MODISTools)
 library(raster)
 library(sf)
 library(leaflet)
-
+library(prism)
 ```
 
 ## Examples from MODISTools vignette
@@ -29,7 +29,9 @@ https://cran.r-project.org/web/packages/MODISTools/vignettes/modistools-vignette
 Values in the land cover download do not match any legend I can find.
 (e.g., here: https://lpdaac.usgs.gov/documents/101/MCD12_User_Guide_V6.pdf or https://developers.google.com/earth-engine/datasets/catalog/MODIS_006_MCD12Q1#bands)
 
-```{r example}
+I used some LCR points.
+
+```{r modisdata}
 # This should be the right legend, but is not.
 lccs1_legend = read.csv("MODIS_MCD12Q1_LC_Prop1_legend.csv")
 
@@ -46,7 +48,6 @@ bands_LC <- mt_bands(product = "MCD12Q1")
 View(bands_LC)
 dates_LC <- mt_dates(product = "MCD12Q1", lat = 32, lon = -114)
 View(dates_LC)
-
 
 # get some example points
 testpoints = pt11 %>%
@@ -114,6 +115,19 @@ text(tp_r_lc)
 plot(st_geometry(tp_4326), add = T)
 
 ```
+
+## PRISM weather data
+
+https://github.com/ropensci/prism
+
+```{r prism}
+prism_get_dl_dir()
+prism_set_dl_dir("C:/Users/PatrickLorch/Documents/prism")
+prism_check_dl_dir()
+
+get_prism_monthlys(type = "tmean", year = 2007:2022, mon = 1:12, keepZip = FALSE)
+```
+
 
 ## Some better plots
 
