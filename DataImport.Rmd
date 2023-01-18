@@ -21,6 +21,7 @@ library(rgdal)
 library(sp)
 # library(sf)
 library(unmarked)
+library(ggplot2)
 ```
 
 ## Background
@@ -36,6 +37,7 @@ library(unmarked)
 ## Data import
 
 I imported any table I could from access .mdb and .accdb files directly as a table for each year into the postgis database (postgis_32_ssrs:ybcu_lcr).  This will allow me to use dplyr or sql commands to combine data into a view that combines years even though table headers are different.  
+
 In dBeaver, use these steps to move a table to the database:
 
 1. Connect the access dB to the dBeaver using 
@@ -54,94 +56,158 @@ In dBeaver, use these steps to move a table to the database:
 
 This should result in this table showing up in the postgres database.
 
-I could not do the same with the data in shapefiles for 2020-2021.  These had been saved as .csv files, but with some unknown coordinate system (x = -12768058.497299999, y = 3948568.8812000006, for example. Shows as WGS 1984 pseudo mercator in .prj file).  These were imported here first, then exported as .csv and added to the postgis database.
+I could not do the same with the data in shapefiles for 2020-2021.  These had been saved as .csv files, but with some unknown coordinate system (x = -12768058.497299999, y = 3948568.8812000006, for example. Shows as WGS 1984 pseudo mercator in .prj file). It looks like I could just divide these by 100000, but I just used st transform instead.  Shapefiles were imported into R first using rgdal, then exported as .csv and added to the postgis database using the method above.
+
+Once in postgis, I can import the data to data.frames from there.
 
 ### Shapefile processing
 
-Uses rgdal::readOGR or read.csv to bring in data from shapefiles
+Uses rgdal::readOGR or read.csv to bring in data from shapefiles.
+*** This will need to be transitioned to using sf rather than sp package ***
+
+2021 data uses updated survey point and detection tables where Cari Lyn split out data for a site that was added last minute (eventually called C2741) and entered initially into another site (C2748).  just changed the Survey Key, Visit Key, and Point Keys of the Eastside data to include the C2748 section code. She did not change the territory keys since she didn't think I was using them for this analysis, nor did she change the point numbers. This is why a second set of survey point and detection tables were imported.
+
+Shapefile import is truncating the Date Collected field (which has a comma in it).  
+
+*** Don't use the spdf versions for the time calcuations etc. ***
+
+I am falling back to importing from csv directly into R.  For now these are not converted to sf or sp objects, since we don't need that for occupancy.
 
 ```{r shapefiles}
-dsn21 = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2021/Data/2021 Shapefiles"
-lcr_ybcu_survey_points_spdf_2021 = readOGR(dsn = dsn21, layer = "Survey Point")
-proj4string(lcr_ybcu_survey_points_spdf_2021)
-sp::coordinates(lcr_ybcu_survey_points_spdf_2021)
 
-dsn21a = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2021/Data/Shapefiles edited to include C2748"
-lcr_ybcu_survey_points_spdf_2021a = readOGR(dsn = dsn21a, layer = "SurveyPoint2021")
-proj4string(lcr_ybcu_survey_points_spdf_2021a)
-sp::coordinates(lcr_ybcu_survey_points_spdf_2021a)
-lcr_ybcu_detections_spdf_2021a = readOGR(dsn = dsn21a, layer = "Detection2021")
-proj4string(lcr_ybcu_detections_spdf_2021a)
-sp::coordinates(lcr_ybcu_detections_spdf_2021a)
-
-dsn20 = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2020/Data/2020 Shapefiles"
-lcr_ybcu_survey_points_spdf_2020 = readOGR(dsn = dsn20, layer = "SurPoint")
-proj4string(lcr_ybcu_survey_points_spdf_2020)
-  
-
+lcr_ybcu_survey_points_df_2019 <- read.csv("C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2019/Data/2019 .csv files/Survey Point.csv")
+# This is just to get the proj4string 
+#   "+proj=utm +zone=11 +datum=NAD83 +units=m +no_defs"
 dsn19 = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2019/Data/2019 Shapefiles"
 lcr_ybcu_survey_points_spdf_2019 = readOGR(dsn = dsn19, layer = "surveypoint2019")
-proj4string(lcr_ybcu_survey_points_spdf_2019)
+crs2019 = proj4string(lcr_ybcu_survey_points_spdf_2019)
+# We do not need to transform this one since it is in UTMs
 
-lcr_ybcu_survey_points_spdf_2022 <- read.csv("C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2022/.csv files/Survey Point.csv")
-coordinates(lcr_ybcu_survey_points_spdf_2022) = ~x + y
-proj4string(lcr_ybcu_survey_points_spdf_2022) = proj4string(lcr_ybcu_survey_points_spdf_2020)
-lcr_ybcu_survey_points_spdf_UTM11_2022 = 
-  spTransform(lcr_ybcu_survey_points_spdf_2022, 
-              CRS(proj4string(lcr_ybcu_survey_points_spdf_2019)))
-lcr_ybcu_survey_points_spdf_UTM11_2022$x11E =
-  coordinates(lcr_ybcu_survey_points_spdf_UTM11_2022)[,1]
-lcr_ybcu_survey_points_spdf_UTM11_2022$y11N =
-  coordinates(lcr_ybcu_survey_points_spdf_UTM11_2022)[,2]
-
-
+lcr_ybcu_survey_points_df_2020 <- read.csv("C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2020/Data/2020 .csv files/Survey Point (1).csv")
+# This is to check the crs fortransformation.
+dsn20 = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2020/Data/2020 Shapefiles"
+lcr_ybcu_survey_points_spdf_2020 = readOGR(dsn = dsn20, layer = "SurPoint")
+crs2020 = proj4string(lcr_ybcu_survey_points_spdf_2020)
+# Make spdf and set coordinates from @data
+coordinates(lcr_ybcu_survey_points_df_2020) = ~x + y
+# Set crs
+proj4string(lcr_ybcu_survey_points_df_2020) = proj4string(lcr_ybcu_survey_points_spdf_2020)
+# Transform to UTM
 lcr_ybcu_survey_points_spdf_UTM11_2020 = 
-  spTransform(lcr_ybcu_survey_points_spdf_2020, 
-              CRS(proj4string(lcr_ybcu_survey_points_spdf_2019)))
-lcr_ybcu_survey_points_spdf_UTM11_2020$x =
-  coordinates(lcr_ybcu_survey_points_spdf_UTM11_2020)[,1]
-lcr_ybcu_survey_points_spdf_UTM11_2020$y =
-  coordinates(lcr_ybcu_survey_points_spdf_UTM11_2020)[,2]
+  spTransform(lcr_ybcu_survey_points_df_2020, 
+              CRS(crs2019))
+# This puts UTM coordinates back into the data file
+lcr_ybcu_survey_points_spdf_UTM11_2020$x11E =
+  sp::coordinates(lcr_ybcu_survey_points_spdf_UTM11_2020)[,1]
+lcr_ybcu_survey_points_spdf_UTM11_2020$y11N =
+  sp::coordinates(lcr_ybcu_survey_points_spdf_UTM11_2020)[,2]
 
+# Using updated file from Cari Lynn
+# dsn21 = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2021/Data/2021 Shapefiles"
+# lcr_ybcu_survey_points_spdf_2021 = readOGR(dsn = dsn21, layer = "Survey Point")
+# proj4string(lcr_ybcu_survey_points_spdf_2021)
+# sp::coordinates(lcr_ybcu_survey_points_spdf_2021)
+
+lcr_ybcu_survey_points_df_2021 <- read.csv("C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2021/Data/Data edited to include C2748/Survey Point 2021 corrected times.csv")
+
+# This is to check the crs for transformation.
+dsn21a = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2021/Data/Data edited to include C2748"
+lcr_ybcu_survey_points_spdf_2021a = readOGR(dsn = dsn21a, layer = "SurveyPoint2021")
+crs2021 = proj4string(lcr_ybcu_survey_points_spdf_2021a)
+# Make spdf and set coordinates from @data
+coordinates(lcr_ybcu_survey_points_df_2021) = ~x + y
+# Set crs
+proj4string(lcr_ybcu_survey_points_df_2021) = proj4string(lcr_ybcu_survey_points_spdf_2021a)
+# Transform to UTM
 lcr_ybcu_survey_points_spdf_UTM11_2021 = 
-  spTransform(lcr_ybcu_survey_points_spdf_2021, 
-              CRS(proj4string(lcr_ybcu_survey_points_spdf_2019)))
-lcr_ybcu_survey_points_spdf_UTM11_2021$x =
-  coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021)[,1]
-lcr_ybcu_survey_points_spdf_UTM11_2021$y =
-  coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021)[,2]
+  spTransform(lcr_ybcu_survey_points_df_2021, 
+              CRS(crs2019))
+# This puts UTM coordinates back into the data file
+lcr_ybcu_survey_points_spdf_UTM11_2021$x11E =
+  sp::coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021)[,1]
+lcr_ybcu_survey_points_spdf_UTM11_2021$y11N =
+  sp::coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021)[,2]
 
-lcr_ybcu_survey_points_spdf_UTM11_2021a = 
-  spTransform(lcr_ybcu_survey_points_spdf_2021a, 
-              CRS(proj4string(lcr_ybcu_survey_points_spdf_2019)))
-lcr_ybcu_survey_points_spdf_UTM11_2021a$x =
-  sp::coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021a)[,1]
-lcr_ybcu_survey_points_spdf_UTM11_2021a$y =
-  sp::coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021a)[,2]
+lcr_ybcu_detections_df_2021a <- read.csv("C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2021/Data/Data edited to include C2748/Detection 2021 corrected times.csv")
+# This is to check the crs for transformation.
+lcr_ybcu_detections_spdf_2021a = readOGR(dsn = dsn21a, layer = "Detection2021")
+crs2021 = proj4string(lcr_ybcu_detections_spdf_2021a)
+# Make spdf and set coordinates from @data
+coordinates(lcr_ybcu_detections_df_2021a) = ~x + y
+# Set crs
+proj4string(lcr_ybcu_detections_df_2021a) = proj4string(lcr_ybcu_detections_spdf_2021a)
+# Transform to UTM
+lcr_ybcu_detections_spdf_UTM11_2021 = 
+  spTransform(lcr_ybcu_detections_df_2021a, 
+              CRS(crs2019))
+# This puts UTM coordinates back into the data file
+lcr_ybcu_detections_spdf_UTM11_2021$x11E =
+  sp::coordinates(lcr_ybcu_detections_spdf_UTM11_2021)[,1]
+lcr_ybcu_detections_spdf_UTM11_2021$y11N =
+  sp::coordinates(lcr_ybcu_detections_spdf_UTM11_2021)[,2]
 
-lcr_ybcu_detections_spdf_UTM11_2021a = 
-  spTransform(lcr_ybcu_detections_spdf_2021a, 
-              CRS(proj4string(lcr_ybcu_survey_points_spdf_2019)))
-lcr_ybcu_detections_spdf_UTM11_2021a$x =
-  sp::coordinates(lcr_ybcu_detections_spdf_UTM11_2021a)[,1]
-lcr_ybcu_detections_spdf_UTM11_2021a$y =
-  sp::coordinates(lcr_ybcu_detections_spdf_UTM11_2021a)[,2]
+lcr_ybcu_survey_points_df_2022 <- read.csv("C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2022/.csv files/Survey Point.csv")
+# Make spdf and set coordinates from @data
+coordinates(lcr_ybcu_survey_points_df_2022) = ~x + y
+# Set crs
+proj4string(lcr_ybcu_survey_points_df_2022) = crs2021
+lcr_ybcu_survey_points_spdf_UTM11_2022 = 
+  spTransform(lcr_ybcu_survey_points_df_2022, 
+              CRS(crs2019))
+# This puts UTM coordinates back into the data file
+lcr_ybcu_survey_points_spdf_UTM11_2022$x11E =
+  sp::coordinates(lcr_ybcu_survey_points_spdf_UTM11_2022)[,1]
+lcr_ybcu_survey_points_spdf_UTM11_2022$y11N =
+  sp::coordinates(lcr_ybcu_survey_points_spdf_UTM11_2022)[,2]
+
+# Not used since we now import from .csv files
+# lcr_ybcu_survey_points_spdf_UTM11_2020 = 
+#   spTransform(lcr_ybcu_survey_points_spdf_2020, 
+#               CRS(proj4string(lcr_ybcu_survey_points_spdf_2019)))
+# lcr_ybcu_survey_points_spdf_UTM11_2020$x =
+#   coordinates(lcr_ybcu_survey_points_spdf_UTM11_2020)[,1]
+# lcr_ybcu_survey_points_spdf_UTM11_2020$y =
+#   coordinates(lcr_ybcu_survey_points_spdf_UTM11_2020)[,2]
+
+# lcr_ybcu_survey_points_spdf_UTM11_2021 = 
+#   spTransform(lcr_ybcu_survey_points_spdf_2021, 
+#               CRS(proj4string(lcr_ybcu_survey_points_spdf_2019)))
+# lcr_ybcu_survey_points_spdf_UTM11_2021$x =
+#   coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021)[,1]
+# lcr_ybcu_survey_points_spdf_UTM11_2021$y =
+#   coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021)[,2]
+
+# lcr_ybcu_survey_points_spdf_UTM11_2021a = 
+#   spTransform(lcr_ybcu_survey_points_spdf_2021a, 
+#               CRS(proj4string(lcr_ybcu_survey_points_spdf_2019)))
+# lcr_ybcu_survey_points_spdf_UTM11_2021a$x =
+#   sp::coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021a)[,1]
+# lcr_ybcu_survey_points_spdf_UTM11_2021a$y =
+#   sp::coordinates(lcr_ybcu_survey_points_spdf_UTM11_2021a)[,2]
+
+# lcr_ybcu_detections_spdf_UTM11_2021a = 
+#   spTransform(lcr_ybcu_detections_spdf_2021a, 
+#               CRS(proj4string(lcr_ybcu_survey_points_spdf_2019)))
+# lcr_ybcu_detections_spdf_UTM11_2021a$x =
+#   sp::coordinates(lcr_ybcu_detections_spdf_UTM11_2021a)[,1]
+# lcr_ybcu_detections_spdf_UTM11_2021a$y =
+#   sp::coordinates(lcr_ybcu_detections_spdf_UTM11_2021a)[,2]
 
 writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2020,
          dsn = "stuff",
          layer = "survey_points_2020_UTM11N",
          driver = "CSV")
+# writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2021,
+#          dsn = "stuff2",
+#          layer = "survey_points_2021_UTM11N",
+#          driver = "CSV")
 writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2021,
-         dsn = "stuff2",
+         dsn = "stuff2a",
          layer = "survey_points_2021_UTM11N",
          driver = "CSV")
-writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2021a,
-         dsn = "stuff2a",
-         layer = "survey_points_2021a_UTM11N",
-         driver = "CSV")
-writeOGR(lcr_ybcu_detections_spdf_UTM11_2021a,
+writeOGR(lcr_ybcu_detections_spdf_UTM11_2021,
          dsn = "stuff2b",
-         layer = "detections_2021a_UTM11N",
+         layer = "detections_2021_UTM11N",
          driver = "CSV")
 writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2022,
          dsn = "stuff3",
@@ -200,7 +266,7 @@ points13 = dbReadTable(connec, "points13")
 points1418 = dbReadTable(connec, "points1418")
 points19 = dbReadTable(connec, "points19")
 points20 = dbReadTable(connec, "points20")
-points21 = dbReadTable(connec, "points2021a")
+points21 = dbReadTable(connec, "points21")
 points22 = dbReadTable(connec, "points22")
 
 surveys1418 = dbReadTable(connec, "surveys1418")
@@ -212,10 +278,16 @@ surveydetections1418 = dbReadTable(connec, "surveydetections1418")
 surveys11 = dbReadTable(connec, "surveys11")
 surveys10 = dbReadTable(connec, "surveys10")
 surveys08 = dbReadTable(connec, "surveys08")
+surveys20 = dbReadTable(connec, "surveys20")
+
+visits19 = dbReadTable(connec, "visits19")
+visits20 = dbReadTable(connec, "visits20")
+visits21 = dbReadTable(connec, "visits21")
+visits22 = dbReadTable(connec, "visits22")
 
 detections19 = dbReadTable(connec, "detections19")
 detections20 = dbReadTable(connec, "detections20")
-detections21 = dbReadTable(connec, "detections2021a")
+detections21 = dbReadTable(connec, "detections21")
 detections22 = dbReadTable(connec, "detections22")
 
 dbDisconnect(conn = connec)
@@ -741,7 +813,7 @@ pt19_det_count = svdet19 %>%
   count(Point.Key, name = "det_count")
 
 pt19 = points19_wfixes %>%
-  select("Survey.Key", "Point.Key", "Survey.Period", "Point.Number",
+  select("Survey.Key", "Visit.Key", "Point.Key", "Survey.Period", "Point.Number",
          "Visit.Number", "Cicada.Count", "Play.Count", "YBCU.Detected", 
          "notes", "Date.Collected", "x", "y") %>%
   rename(svperiod = "Survey.Period", 
@@ -759,13 +831,17 @@ pt19 = points19_wfixes %>%
   left_join(select(cicada12, cicada_index = cicada_code, cicada_cat),
                                   by = c("Cicada.Count" = "cicada_cat")) %>%
   left_join(pt19_det_count, by = "Point.Key") %>%
+  # Don't need this now that Date.collected is fixed
+  # left_join(select(visits19, Visit.Key, visithours =
+  #                    "Total.Number.of.Visit.Hours"), 
+  #           by = c("Visit.Key" = "Visit.Key")) %>%
   mutate(det_count = replace_na(det_count, 0))
 
 ```
 
 ### 2020
 
-Survey point time was not recorded.
+Survey point time was not recorded.  I use visit time from visits20 table.
 
 Problems:
 
@@ -777,9 +853,9 @@ Problems:
 names(points20)
 
 points20_wfixes = points20 %>% 
-  slice(which(objectid != "110")) %>%
-  mutate(survey_key = if_else(objectid == "857",
-                              "FY20-YBC-C2365", survey_key))
+  slice(-1) %>%
+  mutate(Survey.key = if_else(Survey.key == "", 
+                              "FY20-YBC-C2365", Survey.key))
   
 svdet20 = detections20 %>%
   filter(Visit.type == "Survey", New.bird. == "Yes") %>%
@@ -790,23 +866,27 @@ pt20_det_count = svdet20 %>%
 
 # Removing row which is test row
 pt20 = points20_wfixes %>%
-  select("survey_key", 'point_key', "survey_per", "point_num", "cicada_cnt", 
-         "play_cnt", "ybcu_detec", "notes", "date_coll", 
-         "x", "y") %>%
-  rename(svperiod = "survey_per", 
-         numberofplaybacks = "play_cnt", 
-         ybcudetection = "ybcu_detec", 
-         svpointdate = "date_coll",
-         easting = "x", 
-         northing = "y") %>%
-  separate("survey_key",
+  select("Survey.key", "Visit.key", "Point.key", "Survey.period",
+         "Visit.number", "Visit.type", "Detection.method",
+         "Point.number", "Cicada.count", "Play.count", "YBCU.detected.",
+         "notes", "Date.Collected", "x11e", "y11n") %>%
+  rename(svperiod = "Survey.period", 
+         numberofplaybacks = "Play.count", 
+         ybcudetection = "YBCU.detected.", 
+         svpointdate = "Date.Collected",
+         easting = "x11e", 
+         northing = "y11n") %>%
+  separate("Survey.key",
            c("year", "species","loccode1922"),
            extra = 'drop',
            remove = F) %>%
   select(-year, -species) %>%
   left_join(select(cicada12, cicada_index = cicada_code, cicada_cat),
-                                  by = c("cicada_cnt" = "cicada_cat")) %>%
-  left_join(pt20_det_count, by = c("point_key" = "Point.key")) %>%
+                                  by = c("Cicada.count" = "cicada_cat")) %>%
+  left_join(pt20_det_count, by = c("Point.key" = "Point.key")) %>%
+  # left_join(select(visits20, Visit.key, visithours =
+  #                    "Total.number.of.visit.hours"), 
+  #           by = c("visit_key" = "Visit.key")) %>%
   mutate(det_count = replace_na(det_count, 0))
 pt20[713,]
 ```
@@ -819,32 +899,39 @@ names(points21)
 names(detections21)
 
 svdet21 = detections21 %>%
-  filter(visit_type == "Sur", new_bird == "Yes") %>%
-  select(point_key, survey_per, ybcu_num) %>%
-  arrange(survey_per, point_key, ybcu_num) 
+  filter(Visit.type == "Survey", New.bird. == "Yes") %>%
+  select(Point.key, Survey.period, YBCU.number) %>%
+  arrange(Survey.period, Point.key, YBCU.number) 
 pt21_det_count = svdet21 %>%
-  count(point_key, name = "det_count")
+  count(Point.key, name = "det_count")
+
+points21%>%
+  slice(which(Visit.key == ""))
 
 pt21 = points21 %>%
-  slice(which(survey_per != "0")) %>%
-  select("survey_key", "point_key", "survey_per", "point_num", "cicada_cnt", 
-         "play_cnt", "ybcu_detec", "notes", "date_coll", 
-         "x", "y") %>%
-  rename(svperiod = "survey_per", 
-         numberofplaybacks = "play_cnt", 
-         ybcudetection = "ybcu_detec", 
-         svpointdate = "date_coll",
-         easting = "x", 
-         northing = "y") %>%
-  separate("survey_key",
+  slice(which(Survey.period != "0")) %>%
+  slice(which(Visit.key != "")) %>%
+  select("Survey.key", "Visit.key", "Point.key", "Survey.period",
+         "Point.number", "Cicada.count", "Play.count", "YBCU.detected.", 
+         "notes", "Date.Collected", "x11e", "y11n") %>%
+  rename(svperiod = "Survey.period", 
+         numberofplaybacks = "Play.count", 
+         ybcudetection = "YBCU.detected.", 
+         svpointdate = "Date.Collected",
+         easting = "x11e", 
+         northing = "y11n") %>%
+  separate("Survey.key",
            c("year", "species","loccode1922"),
            extra = 'drop',
            remove = F) %>%
   select(-year, -species) %>%
          
   left_join(select(cicada12, cicada_index = cicada_code, cicada_cat),
-                                  by = c("cicada_cnt" = "cicada_cat")) %>%
-  left_join(pt21_det_count, by = c("point_key" = "point_key")) %>%
+                                  by = c("Cicada.count" = "cicada_cat")) %>%
+  left_join(pt21_det_count, by = c("Point.key" = "Point.key")) %>%
+  # left_join(select(visits21, Visit.key, visithours =
+  #                    "Total.number.of.visit.hours"), 
+  #           by = c("visit_key" = "Visit.key")) %>%
   mutate(det_count = replace_na(det_count, 0))
 pt21[c(197, 299, 303),]
 
@@ -871,9 +958,10 @@ pt22_det_count = svdet22 %>%
   count(Point.key, name = "det_count")
 
 pt22 = points22_wfixes %>%
-  select("Survey.key", "Point.key", "Survey.period", "Point.number",
-         "Cicada.count", "Play.count", "YBCU.detected.", "notes",
-         "Date.Collected", "x11e", "y11n") %>%
+  select("Survey.key", "Visit.key", "Point.key", "Survey.period", 
+         "Point.number", "Cicada.count", "Play.count", 
+         "YBCU.detected.", "notes", "Date.Collected", "x11e", 
+         "y11n") %>%
   rename(svperiod = "Survey.period", 
          numberofplaybacks = "Play.count", 
          ybcudetection = "YBCU.detected.", 
@@ -890,6 +978,9 @@ pt22 = points22_wfixes %>%
   left_join(select(cicada12, cicada_index = cicada_code, cicada_cat),
                                   by = c("Cicada.count" = "cicada_cat")) %>%
   left_join(pt22_det_count, by = "Point.key") %>%
+  left_join(select(visits22, Visit.key, visithours =
+                     "Total.number.of.visit.hours"), 
+            by = c("Visit.key" = "Visit.key")) %>%
   mutate(det_count = replace_na(det_count, 0))
 pt22[c(1232, 1234),]
 ```
@@ -958,10 +1049,10 @@ pt19_sum_site = pt19 %>%
             playbacks_sum = sum(as.numeric(numberofplaybacks)),
             det_count = sum(as.numeric(det_count)),
             survey_date = first(as.Date(svpointdate)),
-            survey_duration_approx = as.numeric(
-              max(as.POSIXct(svpointtime, format = "%m/%d/%Y, %I:%M %p")) - 
-              min(as.POSIXct(svpointtime, format = "%m/%d/%Y, %I:%M %p")),
-              units = "secs"),
+            survey_duration_approx = 
+              as.numeric(max(as.POSIXct(svpointtime, format = "%m/%d/%Y, %I:%M %p")) -
+                         min(as.POSIXct(svpointtime, format = "%m/%d/%Y, %I:%M %p")),
+                         units = "secs"),
             mean_easting = mean(as.numeric(easting)),
             mean_northing = mean(as.numeric(northing)),
             cicada_class = Mode(cicada_index))
@@ -985,9 +1076,6 @@ pt19_effort_time_scaled = pt19_effort_time %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
 
-
-
-
 ```
 
 #### 2020
@@ -1001,11 +1089,19 @@ Problems:
 
 ```{r sitesum20}
 pt20_sum_site = pt20 %>%
-  group_by(loccode1922, svperiod, svpointdate) %>%
+  mutate(svdate = 
+           as.Date(as.POSIXct(svpointdate, 
+                              format = "%m/%d/%Y, %I:%M %p"))) %>%
+  group_by(loccode1922, svperiod, svdate) %>%
   summarise(points_surveyed = n(),
             playbacks_sum = sum(as.numeric(numberofplaybacks)),
             det_count = sum(as.numeric(det_count)),
-            survey_date = first(as.Date(svpointdate)),
+            survey_date = 
+              first(svdate),
+            survey_duration_approx = 
+              as.numeric(max(as.POSIXct(svpointdate, format = "%m/%d/%Y, %I:%M %p")) -
+                         min(as.POSIXct(svpointdate, format = "%m/%d/%Y, %I:%M %p")),
+                         units = "secs"),
             mean_easting = mean(as.numeric(easting)),
             mean_northing = mean(as.numeric(northing)),
             cicada_class = Mode(cicada_index))
@@ -1013,11 +1109,20 @@ pt20_sum_site = pt20 %>%
 table(pt20_sum_site$loccode1922, pt20_sum_site$svperiod)
 table(pt20_sum_site$svperiod, pt20_sum_site$det_count)
 
-
 pt20_sitebysvperiod = pt20_sum_site %>% 
   select(svperiod, det_count, loccode1922) %>%
   pivot_wider(names_from = svperiod, values_from = det_count) %>%
   tibble::column_to_rownames("loccode1922")
+
+pt20_effort_time = pt20_sum_site %>%
+  select(svperiod, survey_duration_approx, loccode1922) %>%
+  # mutate(effort_time = Scale(survey_duration_approx)) %>%
+  pivot_wider(names_from = svperiod, values_from = survey_duration_approx) 
+
+pt20_effort_time_scaled = pt20_effort_time %>%
+  select(-1) %>%
+  tibble::column_to_rownames("loccode1922") %>%
+  scale()
 
 ```
 
@@ -1028,13 +1133,22 @@ Problems:
 
 * Three rows with NA for loccode1922
   * Done: Removed all with survey period == 0
+  
 ```{r sitesum21}
 pt21_sum_site = pt21 %>%
-  group_by(loccode1922, svperiod, svpointdate) %>%
+  mutate(svdate = 
+           as.Date(as.POSIXct(svpointdate, 
+                              format = "%m/%d/%Y, %I:%M %p"))) %>%
+  group_by(loccode1922, svperiod, svdate) %>%
   summarise(points_surveyed = n(),
             playbacks_sum = sum(as.numeric(numberofplaybacks)),
             det_count = sum(as.numeric(det_count)),
-            survey_date = first(as.Date(svpointdate)),
+            survey_date = 
+              first(svdate),
+            survey_duration_approx = 
+              as.numeric(max(as.POSIXct(svpointdate, format = "%m/%d/%Y, %I:%M %p")) -
+                         min(as.POSIXct(svpointdate, format = "%m/%d/%Y, %I:%M %p")),
+                         units = "secs"),
             mean_easting = mean(as.numeric(easting)),
             mean_northing = mean(as.numeric(northing)),
             cicada_class = Mode(cicada_index))
@@ -1047,6 +1161,16 @@ pt21_sitebysvperiod = pt21_sum_site %>%
   select(svperiod, det_count, loccode1922) %>%
   pivot_wider(names_from = svperiod, values_from = det_count) %>%
   tibble::column_to_rownames("loccode1922")
+
+pt21_effort_time = pt21_sum_site %>%
+  select(svperiod, survey_duration_approx, loccode1922) %>%
+  # mutate(effort_time = Scale(survey_duration_approx)) %>%
+  pivot_wider(names_from = svperiod, values_from = survey_duration_approx) 
+
+pt21_effort_time_scaled = pt21_effort_time %>%
+  select(-1) %>%
+  tibble::column_to_rownames("loccode1922") %>%
+  scale()
 
 ```
 
@@ -1064,11 +1188,19 @@ Problems:
 
 ```{r sitesum22}
 pt22_sum_site = pt22 %>%
-  group_by(loccode1922, svperiod, svpointdate) %>%
+  mutate(svdate = 
+           as.Date(as.POSIXct(svpointdate, 
+                              format = "%m/%d/%Y, %I:%M %p"))) %>%
+  group_by(loccode1922, svperiod, svdate) %>%
   summarise(points_surveyed = n(),
             playbacks_sum = sum(as.numeric(numberofplaybacks)),
             det_count = sum(as.numeric(det_count)),
-            survey_date = first(as.Date(svpointdate)),
+            survey_date = 
+              first(svdate),
+            survey_duration_approx = 
+              as.numeric(max(as.POSIXct(svpointtime, format = "%m/%d/%Y, %I:%M %p")) -
+                         min(as.POSIXct(svpointtime, format = "%m/%d/%Y, %I:%M %p")),
+                         units = "secs"),
             mean_easting = mean(as.numeric(easting)),
             mean_northing = mean(as.numeric(northing)),
             cicada_class = Mode(cicada_index))
@@ -1082,15 +1214,25 @@ pt22_sitebysvperiod = pt22_sum_site %>%
   pivot_wider(names_from = svperiod, values_from = det_count) %>%
   tibble::column_to_rownames("loccode1922")
 
+pt22_effort_time = pt22_sum_site %>%
+  select(svperiod, survey_duration_approx, loccode1922) %>%
+  # mutate(effort_time = Scale(survey_duration_approx)) %>%
+  pivot_wider(names_from = svperiod, values_from = survey_duration_approx) 
+
+pt22_effort_time_scaled = pt22_effort_time %>%
+  select(-1) %>%
+  tibble::column_to_rownames("loccode1922") %>%
+  scale()
+
 ```
 
 #### Sites by Years comparison
 
 ```{r sitenames}
-sites1922 = unique(c(row.names(pt19_sitebysvperiod),
+(sites1922 = unique(c(row.names(pt19_sitebysvperiod),
       row.names(pt20_sitebysvperiod),
       row.names(pt21_sitebysvperiod),
-      row.names(pt22_sitebysvperiod)))
+      row.names(pt22_sitebysvperiod))))
 
 sites1922.df = rbind(data.frame(Year = 2019, 
                                 Site = row.names(pt19_sitebysvperiod)),
@@ -1106,7 +1248,7 @@ sites1922.wide.df = sites1922.df %>%
   summarise(n = n()) %>%
   pivot_wider(names_from = Year, values_from = n)
 
-sites1922.tab = table(sites1922.df$Site, sites1922.df$Year)
+(sites1922.tab = table(sites1922.df$Site, sites1922.df$Year))
 ```
 
 ### Combine years by site
@@ -1127,12 +1269,12 @@ count1922_sitebysvperiod_list =
        pt21_sbsp,
        pt22_sbsp)
 
-count1922_sitebysvperiod_lj =  
+(count1922_sitebysvperiod_lj =  
 count1922_sitebysvperiod_list %>%
   Reduce(function(df1, df2)
-    left_join(df1, df2, by = "loccode1922"), .)
+    left_join(df1, df2, by = "loccode1922"), .))
 
-svperiodnames1922 =
+(svperiodnames1922 =
   names(count1922_sitebysvperiod_lj)[-1] %>%
   as_data_frame() %>%
   separate(value, c("Period", NA, NA)) %>%
@@ -1140,10 +1282,10 @@ svperiodnames1922 =
                           c(rep(".2019", 4),
                             rep(".2020", 4),
                             rep(".2021", 4),
-                            rep(".2022", 4)))
-  )
+                            rep(".2022", 4))
+  )))
 
-  names(count1922_sitebysvperiod_lj)[-1] = 
+names(count1922_sitebysvperiod_lj)[-1] = 
     as.character(svperiodnames1922$Period2)
 
 
@@ -1164,6 +1306,188 @@ cs[cs > 0] = 1
 presabs1922_sitesbyperiod =
   data.frame(names_count1922, cs)
 rm(cs)
+
+```
+
+### Detection covariates
+
+Right now, this is just effort calculated as time between first and last point data entry.
+
+We would eventually like to have transect length estimate also.
+
+```{r detection}
+class(names_count1922)
+class(pt19_effort_time_scaled)
+
+pt19effscaled.df = pt19_effort_time_scaled %>%
+  as.data.frame(loccode1922 = rownames(.), .) %>%
+  tibble::rownames_to_column()
+names(pt19effscaled.df)[1] = "loccode1922"
+pt20effscaled.df = pt20_effort_time_scaled %>%
+  as.data.frame(loccode1922 = rownames(.), .) %>%
+  tibble::rownames_to_column()
+names(pt20effscaled.df)[1] = "loccode1922"
+pt21effscaled.df = pt21_effort_time_scaled %>%
+  as.data.frame(loccode1922 = rownames(.), .) %>%
+  tibble::rownames_to_column()
+names(pt21effscaled.df)[1] = "loccode1922"
+pt22effscaled.df = pt22_effort_time_scaled %>%
+  as.data.frame(loccode1922 = rownames(.), .) %>%
+  tibble::rownames_to_column()
+names(pt22effscaled.df)[1] = "loccode1922"
+
+effort1922_sitebysvperiod_list = 
+  list(pt19effscaled.df,
+       pt20effscaled.df,
+       pt21effscaled.df,
+       pt22effscaled.df)
+
+(effort1922_sitebysvperiod_lj =  
+effort1922_sitebysvperiod_list %>%
+  Reduce(function(df1, df2)
+    left_join(df1, df2, by = "loccode1922"), .))
+
+(effperiodnames1922 =
+  names(effort1922_sitebysvperiod_lj)[-1] %>%
+  as_data_frame() %>%
+  separate(value, c("Period", NA, NA)) %>%
+  mutate(Period2 = paste0(Period, 
+                          c(rep(".2019", 4),
+                            rep(".2020", 4),
+                            rep(".2021", 4),
+                            rep(".2022", 4))
+  )))
+
+names(effort1922_sitebysvperiod_lj)[-1] = 
+    as.character(effperiodnames1922$Period2)
+```
+
+#### Plot effort
+
+Scaled time between first and last playback is reasonably normally distributed with only a view outliers (e.g., 3.2020)
+
+```{r effortplots}
+cols = names(effort1922_sitebysvperiod_lj[-1])
+effort1922_long = effort1922_sitebysvperiod_lj %>%
+  pivot_longer(cols = all_of(cols),
+               names_to = "period", 
+               values_to = "effort")
+
+effort1922_long %>%
+  ggplot( aes(x = effort, color = period, fill = period)) +
+    geom_histogram(alpha=0.6, binwidth = 1) +
+  facet_wrap(~period)
+
+effort1922_long %>%
+  filter(period == "3.2020") %>%
+  ggplot( aes(x = effort)) +
+    geom_histogram(alpha=0.6, binwidth = 0.2)
+
+```
+
+## Dynamic Occupancy model with effort, year and period
+
+### Simple model with time measure of effort
+
+Model fit is not good and c-hat is almost 2, but we don't have site or yearly site covariates.
+
+```{r occsimple}
+library(unmarked)
+# remove loccode1922
+umf_eff_only = unmarkedMultFrame(y = presabs1922_sitesbyperiod[,-1],
+                 numPrimary = 4,
+                 obsCovs = list(effort = 
+                                  effort1922_sitebysvperiod_lj[,-1])
+)
+
+summary(umf_eff_only)
+
+
+dynamic_occ_m1 = colext( psiformula = ~ 1,
+                     gammaformula = ~ 1,
+                     epsilonformula = ~ 1,
+                     pformula = ~effort,
+                     data = umf_eff_only,
+                     # optim method, leave as "BFGS"
+                     method = "BFGS",
+                     control = list(trace=1, maxit=1e4))
+
+# Mackenzie-Bailey GOF test
+# Simulate capture history data (if model correct). Compare obs X2 to sim X2
+# Must simulate 1000-5000 times for good distribution estimates
+# Likely to take a Very Long Time on large data sets
+# with nsim = 10, takes my Mackbook ~ 60 seconds
+mb.boot <- AICcmodavg::mb.gof.test(dynamic_occ_m1,
+                                   nsim = 1000) # Must be much higher than five to be useful
+
+print(mb.boot, digit.vals = 4, digits.chisq = 4)
+
+summary(dynamic_occ_m1)
+
+# The predicted occupancy probability for each site during each primary survey (year). This is stored in an array within the model object (dynamic_occ_m1@smoothed). The array is 2 (a vector of probabilities for 1. unoccupied and 2. occupied) x 5 (number of primary surveys) x 100 (number of sites).
+
+# Occupancy probability for each of 4 years by site
+dynamic_occ_m1@smoothed[2,,]
+
+# Mean smoothed occupancy probabilities can be accessed using:
+# dynamic_occ_m1@smoothed.mean, or
+# smoothed(dynamic_occ_m1)
+
+# Calculate SE for derived occupancy predictions using bootstrap, larger B requires longer time
+m1 <- nonparboot(dynamic_occ_m1, 
+                 B = 1000)
+
+# Predicted occupancy in each year (with SE)
+# the "[2,]" calls the occupied estimates,
+# "[1,]" for unoccupied estimates
+predicted_occupancy <- data.frame(year = c(2019:2022),
+                             smoothed_occ = smoothed(dynamic_occ_m1)[2,],
+                             SE = m1@smoothed.mean.bsse[2,])
+predocc_plot = predicted_occupancy %>%
+  ggplot(aes(x = year, y = smoothed_occ)) +
+  geom_line() +
+  geom_point() +
+  geom_errorbar(aes(ymin = smoothed_occ - SE, 
+                    ymax = smoothed_occ + SE),
+                width = 0.2)
+print(predocc_plot)
+predocc_plot + labs(title="Occupancy Probability 2019-2022", 
+                    x="Year", 
+                    y = "Occupancy Probability")+
+   theme_classic() +
+   scale_color_manual(values='#E69F00')
+```
+
+### Testing for period effects
+
+```{r period}
+pt19_sum_site$det_count_3plus = 
+  as.factor(ifelse(pt19_sum_site$det_count > 2,
+                   "3+", pt19_sum_site$det_count))
+table(pt19_sum_site$svperiod, pt19_sum_site$det_count)
+(pt19_sum_site.tab = as.data.frame.matrix(table(pt19_sum_site$svperiod, pt19_sum_site$det_count_3plus)))
+(pt19_sum_site.tab.chi = chisq.test(pt19_sum_site$svperiod, pt19_sum_site$det_count_3plus))
+
+pt20_sum_site$det_count_3plus = 
+  as.factor(ifelse(pt20_sum_site$det_count > 2,
+                   "3+", pt20_sum_site$det_count))
+table(pt20_sum_site$svperiod, pt20_sum_site$det_count)
+(pt20_sum_site.tab = as.data.frame.matrix(table(pt20_sum_site$svperiod, pt20_sum_site$det_count_3plus)))
+(pt20_sum_site.tab.chi = chisq.test(pt20_sum_site$svperiod, pt20_sum_site$det_count_3plus))
+
+pt21_sum_site$det_count_3plus = 
+  as.factor(ifelse(pt21_sum_site$det_count > 2,
+                   "3+", pt21_sum_site$det_count))
+table(pt21_sum_site$svperiod, pt21_sum_site$det_count)
+(pt21_sum_site.tab = as.data.frame.matrix(table(pt21_sum_site$svperiod, pt21_sum_site$det_count_3plus)))
+(pt21_sum_site.tab.chi = chisq.test(pt21_sum_site$svperiod, pt21_sum_site$det_count_3plus))
+
+pt22_sum_site$det_count_2plus = 
+  as.factor(ifelse(pt22_sum_site$det_count > 1,
+                   "2+", pt22_sum_site$det_count))
+table(pt22_sum_site$svperiod, pt22_sum_site$det_count)
+(pt22_sum_site.tab = as.data.frame.matrix(table(pt22_sum_site$svperiod, pt22_sum_site$det_count_2plus)))
+(pt22_sum_site.tab.chi = chisq.test(pt22_sum_site$svperiod, pt22_sum_site$det_count_2plus))
 
 ```
 
