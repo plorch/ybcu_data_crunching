@@ -5,9 +5,11 @@ date: "2022-12-06"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+## Analysis history
+
+I started with trying to combine all 14 years into one dataset.  Each year or range (2014-2018) is imported, some columns are renamed, some variables are transformed.  In some cases, I had to go to other tables and join in the data to get something comparable to what was in 2014-2018 files.  Once I did this for all years, I began focusing on 2019-2022 to use in an occupancy model to help with Buereau of Reclamation summary report for those years.
+
+Initially, all the import and reformat code was in one place and the code to reformat and summarize by site (with detection counts) was done in another section.  As the code blocks have gotten longer, I moved the summary code up to be with the import and reformat code, since it is easier to re-run it this way.
 
 ### Libraries
 
@@ -216,9 +218,9 @@ writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2022,
 
 ```
 
-## Import survey point data for all years
+### Import survey point data for all years and summarize by site for occupancy modeling
 
-### Data gathering notes
+#### Data gathering notes
 
 To help interpret datasets from different years, here is what I understand.
 
@@ -228,10 +230,7 @@ To help interpret datasets from different years, here is what I understand.
 * 2019-2021 Arc Collector on phones and tablets.
 * 2022 Arc Field Maps on phones and tablets.
 
-### Notes on how to convert some values into others
-
-
-### Connect to postgis database
+#### Connect to postgis database
 
 First bring data in from tables in postgis database.
 
@@ -293,9 +292,11 @@ detections22 = dbReadTable(connec, "detections22")
 dbDisconnect(conn = connec)
 ```
 
-### Append dataframes together
+#### Aborted for now:  Append dataframes together
 
-Then append yearly dataframes together adding year. We will start with points1418 since it has multiple years and already has the structure we want.
+*** This is not as easy as I had thought and I abandoned trying to get all 14 years together in one frame for now. ***
+
+Then append yearly dataframes together adding year. We started with points1418 since it has multiple years and already has the structure we want.
 
 We need to map column names in a transparent way, so we do that first.  Some may need to be converted or coded before combining. For example, cic_ind was an index of Cicada abundance used from 2014-2018. In other years, a text field with a count or a range was given. Also some times are character, most are POSIXct
 
@@ -303,7 +304,7 @@ The 2014-2018 dataset (and some others) does not have survey period assigned.  D
 
 ***Note:*** If we need survey period for all years.  We may just have to go through the 2015 (possibly some other years) and assign them manually, and then use the non-overlapping start and end dates in sv_periods1418 for 2016-2018. 2014 already had period recorded. It is not recorded in 2011, afaikt. 
 
-#### Cicada data
+#### Cicada data notes
 
 * in 2014-2018 codes where used for cic_ind from 0-5 representing
   * "0"     "1"     "2-5"   "6-10"  "11-19" ">20"
@@ -311,7 +312,29 @@ The 2014-2018 dataset (and some others) does not have survey period assigned.  D
 * The table cicada12 has this in table form and I added the codes for joining
 
 
-### 2014-2018
+#### Summarize by site
+
+
+These playback surveys have some features that make modeling effort difficult:
+
+  * If a cuckoo is detected, surveyors move along the transect line 300 m from the estimated location of the detected cuckoo.  
+    * This results in skipping potential survey points
+    * This makes using survey point total a bad measure of effort
+  * If a cuckoo is detected, playback is supposed to stop
+    * This makes using playback number a bad measure of effort
+    * The ratio of the actual number to the potential number of playbacks might be useful
+  * ***Transect length, potential survey point count, or site area might be worth adding to the detection model***
+  
+Ideally, we get a site level summary of detection for multiple years, then combine them into a matrix of 0 and 1s for each site for each period and year.
+
+Year would then be the primary sampling period and survey period the secondary for dynamic occupancy models.
+
+I have added survey_duration_approx which is the min and max time for points in a site/section.
+
+***Errors***
+When you run the summary the first time with date in group_by(), the following errors are found.
+
+#### 2014-2018
 
 Survey detection tables will have multiple rows per point if more than one bird is detected.
 
@@ -388,7 +411,7 @@ sv_periods1418 = surveys1418 %>%
 #   mutate(svperiod2 = 1:length(svpointdate))
 ```
 
-### 2013
+#### 2013
 
 To distinguish cases where the same surveyor went to different parts of a site at different times and used the same point number (for this year and 2008-2010), we have added ptsvvisitno to detection_key.  Surveyors are supposed to use different visit numbers.
 
@@ -437,7 +460,7 @@ pt13_distinct = pt13 %>% distinct(detection_key, .keep_all = T)
 ```
 
 
-### 2012
+#### 2012
 
 For some reason, just this year, the database was mostly normalized. This may be the year John Stanek set up an online MySQL database for data entry.
 
@@ -504,7 +527,7 @@ pt12_distinct = pt12 %>% distinct(survey_id, gps_number, .keep_all = T)
   
 ```
 
-#### Find close points
+##### Find close points
 
 This is a boondoggle.  But the plot is a nice tool.
 
@@ -550,7 +573,7 @@ pt12_sf[1:40,] %>% group_by(survey_id) %>% st_nn(., ., k=2, returnDist = T)
 ```
 
 
-### 2011
+#### 2011
 
 I am not seeing that there are any multiple detections per point (as in 2013?). There is either no new survey detection or 1. 
 
@@ -602,7 +625,7 @@ pt11_distinct = pt11 %>% distinct(detection_key, .keep_all = T)
 ```
 
 
-### 2010
+#### 2010
 
 ***For 2008-2009 we need to count multiple detections still.***
 
@@ -661,7 +684,7 @@ pt10_distinct = pt10 %>% distinct(detection_key, .keep_all = T)
 ```
 
 
-### 2009
+#### 2009
 
 There are two points tables in the access db for 09.  One has ptincid (svPoints09), the other has ptvistype (lcrybcuPts09).  I treat these the same.
 
@@ -703,7 +726,7 @@ pt09_distinct = pt09 %>% distinct(detection_key, .keep_all = T)
 ```
 
 
-### 2008
+#### 2008
 
 Surveyor id (ptsrvr in 09 tables) was put in surveyor08 table.  Primary key for points08 involves gps which was not recorded the same way in the surveys08 table, requiring a bunch of extra work.  However, once we have that, we don't really need to join the surveys table to get surveyor, for example, since the primary key combo is unique.
 
@@ -754,7 +777,7 @@ For 2019-2022 data, non-survey data is the follow-up data, which is visit data c
 [Yesterday 4:16 PM] Cari Lynn Squibb
 To get the number of new, unique survey YBCU detections for the 2019-2022 data you just need to filter the Detection features for Visit Type = Survey and New Bird = Yes. Detections relate to their respective Survey Points via the Point Key.
 
-### 2019
+#### 2019
 
 We have to do it differently, but it is basically the same as 2011.
 
@@ -839,178 +862,7 @@ pt19 = points19_wfixes %>%
 
 ```
 
-### 2020
-
-Survey point time was not recorded.  I use visit time from visits20 table.
-
-Problems:
-
-* There is row in the summary that has NA for survey site.  
-  * Looks like it should be 2365 survey period 2, based on ins point key and date
-* A test row needs to be deleted
-
-```{r combine20}
-names(points20)
-
-points20_wfixes = points20 %>% 
-  slice(-1) %>%
-  mutate(Survey.key = if_else(Survey.key == "", 
-                              "FY20-YBC-C2365", Survey.key))
-  
-svdet20 = detections20 %>%
-  filter(Visit.type == "Survey", New.bird. == "Yes") %>%
-  select(Point.key, Survey.period, YBCU.number) %>%
-  arrange(Survey.period, Point.key, YBCU.number) 
-pt20_det_count = svdet20 %>%
-  count(Point.key, name = "det_count")
-
-# Removing row which is test row
-pt20 = points20_wfixes %>%
-  select("Survey.key", "Visit.key", "Point.key", "Survey.period",
-         "Visit.number", "Visit.type", "Detection.method",
-         "Point.number", "Cicada.count", "Play.count", "YBCU.detected.",
-         "notes", "Date.Collected", "x11e", "y11n") %>%
-  rename(svperiod = "Survey.period", 
-         numberofplaybacks = "Play.count", 
-         ybcudetection = "YBCU.detected.", 
-         svpointdate = "Date.Collected",
-         easting = "x11e", 
-         northing = "y11n") %>%
-  separate("Survey.key",
-           c("year", "species","loccode1922"),
-           extra = 'drop',
-           remove = F) %>%
-  select(-year, -species) %>%
-  left_join(select(cicada12, cicada_index = cicada_code, cicada_cat),
-                                  by = c("Cicada.count" = "cicada_cat")) %>%
-  left_join(pt20_det_count, by = c("Point.key" = "Point.key")) %>%
-  # left_join(select(visits20, Visit.key, visithours =
-  #                    "Total.number.of.visit.hours"), 
-  #           by = c("visit_key" = "Visit.key")) %>%
-  mutate(det_count = replace_na(det_count, 0))
-pt20[713,]
-```
-
-### 2021
-
-
-```{r combine21}
-names(points21)
-names(detections21)
-
-svdet21 = detections21 %>%
-  filter(Visit.type == "Survey", New.bird. == "Yes") %>%
-  select(Point.key, Survey.period, YBCU.number) %>%
-  arrange(Survey.period, Point.key, YBCU.number) 
-pt21_det_count = svdet21 %>%
-  count(Point.key, name = "det_count")
-
-points21%>%
-  slice(which(Visit.key == ""))
-
-pt21 = points21 %>%
-  slice(which(Survey.period != "0")) %>%
-  slice(which(Visit.key != "")) %>%
-  select("Survey.key", "Visit.key", "Point.key", "Survey.period",
-         "Point.number", "Cicada.count", "Play.count", "YBCU.detected.", 
-         "notes", "Date.Collected", "x11e", "y11n") %>%
-  rename(svperiod = "Survey.period", 
-         numberofplaybacks = "Play.count", 
-         ybcudetection = "YBCU.detected.", 
-         svpointdate = "Date.Collected",
-         easting = "x11e", 
-         northing = "y11n") %>%
-  separate("Survey.key",
-           c("year", "species","loccode1922"),
-           extra = 'drop',
-           remove = F) %>%
-  select(-year, -species) %>%
-         
-  left_join(select(cicada12, cicada_index = cicada_code, cicada_cat),
-                                  by = c("Cicada.count" = "cicada_cat")) %>%
-  left_join(pt21_det_count, by = c("Point.key" = "Point.key")) %>%
-  # left_join(select(visits21, Visit.key, visithours =
-  #                    "Total.number.of.visit.hours"), 
-  #           by = c("visit_key" = "Visit.key")) %>%
-  mutate(det_count = replace_na(det_count, 0))
-pt21[c(197, 299, 303),]
-
-```
-
-### 2022
-
-
-```{r combine22}
-names(points22)
-
-points22_wfixes = points22 %>% 
-  slice(-c(1232, 1234)) %>%
-  mutate(Survey.period = if_else(Visit.key == "FY22-YBC-C1507-Sur-V3",
-                              "3", Survey.period)) %>%
-  mutate(Survey.period = if_else(Visit.key == "FY22-YBC-C1507-Sur-V4",
-                              "4", Survey.period))
-
-svdet22 = detections22 %>%
-  filter(Visit.type == "Survey", New.bird. == "Yes") %>%
-  select(Point.key, Survey.period, YBCU.number) %>%
-  arrange(Survey.period, Point.key, YBCU.number) 
-pt22_det_count = svdet22 %>%
-  count(Point.key, name = "det_count")
-
-pt22 = points22_wfixes %>%
-  select("Survey.key", "Visit.key", "Point.key", "Survey.period", 
-         "Point.number", "Cicada.count", "Play.count", 
-         "YBCU.detected.", "notes", "Date.Collected", "x11e", 
-         "y11n") %>%
-  rename(svperiod = "Survey.period", 
-         numberofplaybacks = "Play.count", 
-         ybcudetection = "YBCU.detected.", 
-         svpointtime = "Date.Collected",
-         easting = "x11e", 
-         northing = "y11n") %>%
-  separate("Survey.key",
-           c("year", "species","loccode1922"),
-           extra = 'drop',
-           remove = F) %>%
-  select(-year, -species) %>%
-  mutate(svpointdate = as.Date(svpointtime, "%m/%d/%Y")) %>%
-         
-  left_join(select(cicada12, cicada_index = cicada_code, cicada_cat),
-                                  by = c("Cicada.count" = "cicada_cat")) %>%
-  left_join(pt22_det_count, by = "Point.key") %>%
-  left_join(select(visits22, Visit.key, visithours =
-                     "Total.number.of.visit.hours"), 
-            by = c("Visit.key" = "Visit.key")) %>%
-  mutate(det_count = replace_na(det_count, 0))
-pt22[c(1232, 1234),]
-```
-
-
-
-## Unmarked data reformat
-
-### Summarize by site
-
-These playback surveys have some features that make modeling effort difficult:
-
-  * If a cuckoo is detected, surveyors move along the transect line 300 m from the estimated location of the detected cuckoo.  
-    * This results in skipping potential survey points
-    * This makes using survey point total a bad measure of effort
-  * If a cuckoo is detected, playback is supposed to stop
-    * This makes using playback number a bad measure of effort
-    * The ratio of the actual number to the potential number of playbacks might be useful
-  * ***Transect length, potential survey point count, or site area might be worth adding to the detection model***
-  
-Ideally, we get a site level summary of detection for multiple years, then combine them into a matrix of 0 and 1s for each site for each period and year.
-
-Year would then be the primary sampling period and survey period the secondary for dynamic occupancy models.
-
-I have added survey_duration_approx which is the min and max time for points in a site/section.
-
-***Errors***
-When you run the summary the first time with date in group_by(), the following errors are found.
-
-#### 2019
+##### Summarize by site, 2019
 
 I have gone back to where I imported points19 to fix these in points19 (code block combine19) so the changes carry through.
 
@@ -1078,7 +930,62 @@ pt19_effort_time_scaled = pt19_effort_time %>%
 
 ```
 
+
+
 #### 2020
+
+Survey point time was not recorded.  I use visit time from visits20 table.
+
+Problems:
+
+* There is row in the summary that has NA for survey site.  
+  * Looks like it should be 2365 survey period 2, based on ins point key and date
+* A test row needs to be deleted
+
+```{r combine20}
+names(points20)
+
+points20_wfixes = points20 %>% 
+  slice(-1) %>%
+  mutate(Survey.key = if_else(Survey.key == "", 
+                              "FY20-YBC-C2365", Survey.key))
+  
+svdet20 = detections20 %>%
+  filter(Visit.type == "Survey", New.bird. == "Yes") %>%
+  select(Point.key, Survey.period, YBCU.number) %>%
+  arrange(Survey.period, Point.key, YBCU.number) 
+pt20_det_count = svdet20 %>%
+  count(Point.key, name = "det_count")
+
+# Removing row which is test row
+pt20 = points20_wfixes %>%
+  select("Survey.key", "Visit.key", "Point.key", "Survey.period",
+         "Visit.number", "Visit.type", "Detection.method",
+         "Point.number", "Cicada.count", "Play.count", "YBCU.detected.",
+         "notes", "Date.Collected", "x11e", "y11n") %>%
+  rename(svperiod = "Survey.period", 
+         numberofplaybacks = "Play.count", 
+         ybcudetection = "YBCU.detected.", 
+         svpointdate = "Date.Collected",
+         easting = "x11e", 
+         northing = "y11n") %>%
+  separate("Survey.key",
+           c("year", "species","loccode1922"),
+           extra = 'drop',
+           remove = F) %>%
+  select(-year, -species) %>%
+  left_join(select(cicada12, cicada_index = cicada_code, cicada_cat),
+                                  by = c("Cicada.count" = "cicada_cat")) %>%
+  left_join(pt20_det_count, by = c("Point.key" = "Point.key")) %>%
+  # left_join(select(visits20, Visit.key, visithours =
+  #                    "Total.number.of.visit.hours"), 
+  #           by = c("visit_key" = "Visit.key")) %>%
+  mutate(det_count = replace_na(det_count, 0))
+pt20[713,]
+```
+
+##### Summarize by site, 2020
+
 I have gone back to where I imported points20 to fix these in points20 (code block combine20) so the changes carry through.
 
 Problems:
@@ -1126,7 +1033,55 @@ pt20_effort_time_scaled = pt20_effort_time %>%
 
 ```
 
+
+
 #### 2021
+
+```{r combine21}
+names(points21)
+names(detections21)
+
+svdet21 = detections21 %>%
+  filter(Visit.type == "Survey", New.bird. == "Yes") %>%
+  select(Point.key, Survey.period, YBCU.number) %>%
+  arrange(Survey.period, Point.key, YBCU.number) 
+pt21_det_count = svdet21 %>%
+  count(Point.key, name = "det_count")
+
+points21%>%
+  slice(which(Visit.key == ""))
+
+pt21 = points21 %>%
+  slice(which(Survey.period != "0")) %>%
+  slice(which(Visit.key != "")) %>%
+  select("Survey.key", "Visit.key", "Point.key", "Survey.period",
+         "Point.number", "Cicada.count", "Play.count", "YBCU.detected.", 
+         "notes", "Date.Collected", "x11e", "y11n") %>%
+  rename(svperiod = "Survey.period", 
+         numberofplaybacks = "Play.count", 
+         ybcudetection = "YBCU.detected.", 
+         svpointdate = "Date.Collected",
+         easting = "x11e", 
+         northing = "y11n") %>%
+  separate("Survey.key",
+           c("year", "species","loccode1922"),
+           extra = 'drop',
+           remove = F) %>%
+  select(-year, -species) %>%
+         
+  left_join(select(cicada12, cicada_index = cicada_code, cicada_cat),
+                                  by = c("Cicada.count" = "cicada_cat")) %>%
+  left_join(pt21_det_count, by = c("Point.key" = "Point.key")) %>%
+  # left_join(select(visits21, Visit.key, visithours =
+  #                    "Total.number.of.visit.hours"), 
+  #           by = c("visit_key" = "Visit.key")) %>%
+  mutate(det_count = replace_na(det_count, 0))
+pt21[c(197, 299, 303),]
+
+```
+
+##### Summarize by site, 2021
+
 I have gone back to where I imported points21 to fix these in points21 (code block combine21) so the changes carry through.
 
 Problems:
@@ -1174,7 +1129,57 @@ pt21_effort_time_scaled = pt21_effort_time %>%
 
 ```
 
+
 #### 2022
+
+
+```{r combine22}
+names(points22)
+
+points22_wfixes = points22 %>% 
+  slice(-c(1232, 1234)) %>%
+  mutate(Survey.period = if_else(Visit.key == "FY22-YBC-C1507-Sur-V3",
+                              "3", Survey.period)) %>%
+  mutate(Survey.period = if_else(Visit.key == "FY22-YBC-C1507-Sur-V4",
+                              "4", Survey.period))
+
+svdet22 = detections22 %>%
+  filter(Visit.type == "Survey", New.bird. == "Yes") %>%
+  select(Point.key, Survey.period, YBCU.number) %>%
+  arrange(Survey.period, Point.key, YBCU.number) 
+pt22_det_count = svdet22 %>%
+  count(Point.key, name = "det_count")
+
+pt22 = points22_wfixes %>%
+  select("Survey.key", "Visit.key", "Point.key", "Survey.period", 
+         "Point.number", "Cicada.count", "Play.count", 
+         "YBCU.detected.", "notes", "Date.Collected", "x11e", 
+         "y11n") %>%
+  rename(svperiod = "Survey.period", 
+         numberofplaybacks = "Play.count", 
+         ybcudetection = "YBCU.detected.", 
+         svpointtime = "Date.Collected",
+         easting = "x11e", 
+         northing = "y11n") %>%
+  separate("Survey.key",
+           c("year", "species","loccode1922"),
+           extra = 'drop',
+           remove = F) %>%
+  select(-year, -species) %>%
+  mutate(svpointdate = as.Date(svpointtime, "%m/%d/%Y")) %>%
+         
+  left_join(select(cicada12, cicada_index = cicada_code, cicada_cat),
+                                  by = c("Cicada.count" = "cicada_cat")) %>%
+  left_join(pt22_det_count, by = "Point.key") %>%
+  left_join(select(visits22, Visit.key, visithours =
+                     "Total.number.of.visit.hours"), 
+            by = c("Visit.key" = "Visit.key")) %>%
+  mutate(det_count = replace_na(det_count, 0))
+pt22[c(1232, 1234),]
+```
+
+##### Summarize by site, 2022
+
 I have gone back to where I imported points21 to fix these in points21 (code block combine21) so the changes carry through.
 
 Problems:
@@ -1226,7 +1231,13 @@ pt22_effort_time_scaled = pt22_effort_time %>%
 
 ```
 
-#### Sites by Years comparison
+
+
+## Unmarked data reformat
+
+I started with a simple occupancy model for 2019-2022 data. So I just show how I combined data for those years.
+
+### Sites by Years comparison
 
 ```{r sitenames}
 (sites1922 = unique(c(row.names(pt19_sitebysvperiod),
@@ -1251,7 +1262,7 @@ sites1922.wide.df = sites1922.df %>%
 (sites1922.tab = table(sites1922.df$Site, sites1922.df$Year))
 ```
 
-### Combine years by site
+### Combine years of detection history by site
 
 ```{r combineyears}
 pt19_sbsp = pt19_sitebysvperiod %>%
@@ -1385,7 +1396,9 @@ effort1922_long %>%
 
 ```
 
-## Dynamic Occupancy model with effort, year and period
+## Dynamic Occupancy model with effort, year as primary time element
+
+Since I had to summarize detections by site, survey periods are our replicates within year.  Points cannot be used for this because they are a mess to work with.  Eventually, it might be nice to figure out how to use points as replicates and test for survey period effects.  For now I use Chi-Squared tests to show that there is essentially an effect of period on detections with the middle two periods always being best.  There may be a significant Year by survey period interaction.  If you have to choose one period, period 2 is almost always best.
 
 ### Simple model with time measure of effort
 
@@ -1459,6 +1472,8 @@ predocc_plot + labs(title="Occupancy Probability 2019-2022",
 ```
 
 ### Testing for period effects
+
+These Chi-Squared tests test whether period and the number of sites with one or more detections are independant.  They are significantly associated in years 2019-2020 but not in 2011-2022.
 
 ```{r period}
 pt19_sum_site$det_count_3plus = 
