@@ -218,8 +218,7 @@ writeOGR(lcr_ybcu_survey_points_spdf_UTM11_2022,
 
 ```
 
-### Import survey point data for all years and summarize by site for occupancy modeling
-
+### Import survey points for all years and summarize by site for occupancy modeling
 #### Data gathering notes
 
 To help interpret datasets from different years, here is what I understand.
@@ -313,7 +312,6 @@ The 2014-2018 dataset (and some others) does not have survey period assigned.  D
 
 
 #### Summarize by site
-
 
 These playback surveys have some features that make modeling effort difficult:
 
@@ -1440,7 +1438,10 @@ summary(dynamic_occ_m1)
 # The predicted occupancy probability for each site during each primary survey (year). This is stored in an array within the model object (dynamic_occ_m1@smoothed). The array is 2 (a vector of probabilities for 1. unoccupied and 2. occupied) x 5 (number of primary surveys) x 100 (number of sites).
 
 # Occupancy probability for each of 4 years by site
-dynamic_occ_m1@smoothed[2,,]
+
+occu_by_site = as.data.frame.matrix(dynamic_occ_m1@smoothed[2,,])
+names(occu_by_site) = names_count1922$loccode1922
+View(occu_by_site)
 
 # Mean smoothed occupancy probabilities can be accessed using:
 # dynamic_occ_m1@smoothed.mean, or
