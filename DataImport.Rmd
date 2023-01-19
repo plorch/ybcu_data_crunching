@@ -11,7 +11,7 @@ I started with trying to combine all 14 years into one dataset.  Each year or ra
 
 Initially, all the import and reformat code was in one place and the code to reformat and summarize by site (with detection counts) was done in another section.  As the code blocks have gotten longer, I moved the summary code up to be with the import and reformat code, since it is easier to re-run it this way.
 
-### Libraries
+## Libraries
 
 ```{r libraries}
 library(DBI)
@@ -926,6 +926,20 @@ pt19_effort_time_scaled = pt19_effort_time %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
 
+table(pt19$loccode1922, pt19$cicada_index, pt19$svperiod)
+
+pt19_cicada_ind = pt19 %>%
+  select(loccode1922, cicada_index, svperiod) %>%
+  group_by(loccode1922, svperiod) %>%
+  summarise(mean_cic_ind = mean(cicada_index))
+
+pt19_cicada_ind_byperiod = pt19_cicada_ind %>%
+  pivot_wider(names_from = svperiod,
+              values_from = mean_cic_ind) 
+
+pt19_cicada_ind_byperiod_scaled = pt19_cicada_ind_byperiod %>%
+  tibble::column_to_rownames("loccode1922") %>%
+  scale()
 ```
 
 
@@ -1029,6 +1043,21 @@ pt20_effort_time_scaled = pt20_effort_time %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
 
+table(pt20$loccode1922, pt20$cicada_index, pt20$svperiod)
+
+pt20_cicada_ind = pt20 %>%
+  select(loccode1922, cicada_index, svperiod) %>%
+  group_by(loccode1922, svperiod) %>%
+  summarise(mean_cic_ind = mean(cicada_index))
+
+pt20_cicada_ind_byperiod = pt20_cicada_ind %>%
+  pivot_wider(names_from = svperiod,
+              values_from = mean_cic_ind) 
+
+pt20_cicada_ind_byperiod_scaled = pt20_cicada_ind_byperiod %>%
+  tibble::column_to_rownames("loccode1922") %>%
+  scale()
+
 ```
 
 
@@ -1046,10 +1075,23 @@ svdet21 = detections21 %>%
 pt21_det_count = svdet21 %>%
   count(Point.key, name = "det_count")
 
+# Somehow, Cicada.cat got changed to dates (opened in excel)
+points21_fixed = points21%>%
+  mutate(Cicada.count = if_else(Cicada.count == "5-Feb",
+                                "2-5", 
+                                Cicada.count)) %>%
+  mutate(Cicada.count = if_else(Cicada.count == "19-Nov",
+                                "11-19", 
+                                Cicada.count)) %>%
+  mutate(Cicada.count = if_else(Cicada.count == "10-June",
+                                "6-10", 
+                                Cicada.count))
+
+
 points21%>%
   slice(which(Visit.key == ""))
 
-pt21 = points21 %>%
+pt21 = points21_fixed %>%
   slice(which(Survey.period != "0")) %>%
   slice(which(Visit.key != "")) %>%
   select("Survey.key", "Visit.key", "Point.key", "Survey.period",
@@ -1122,6 +1164,21 @@ pt21_effort_time = pt21_sum_site %>%
 
 pt21_effort_time_scaled = pt21_effort_time %>%
   select(-1) %>%
+  tibble::column_to_rownames("loccode1922") %>%
+  scale()
+
+table(pt21$loccode1922, pt21$cicada_index, pt21$svperiod)
+
+pt21_cicada_ind = pt21 %>%
+  select(loccode1922, cicada_index, svperiod) %>%
+  group_by(loccode1922, svperiod) %>%
+  summarise(mean_cic_ind = mean(cicada_index))
+
+pt21_cicada_ind_byperiod = pt21_cicada_ind %>%
+  pivot_wider(names_from = svperiod,
+              values_from = mean_cic_ind) 
+
+pt21_cicada_ind_byperiod_scaled = pt21_cicada_ind_byperiod %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
 
