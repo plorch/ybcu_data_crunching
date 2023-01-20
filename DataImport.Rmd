@@ -1284,6 +1284,20 @@ pt22_effort_time_scaled = pt22_effort_time %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
 
+table(pt22$loccode1922, pt22$cicada_index, pt22$svperiod)
+
+pt22_cicada_ind = pt22 %>%
+  select(loccode1922, cicada_index, svperiod) %>%
+  group_by(loccode1922, svperiod) %>%
+  summarise(mean_cic_ind = mean(cicada_index))
+
+pt22_cicada_ind_byperiod = pt22_cicada_ind %>%
+  pivot_wider(names_from = svperiod,
+              values_from = mean_cic_ind) 
+
+pt22_cicada_ind_byperiod_scaled = pt22_cicada_ind_byperiod %>%
+  tibble::column_to_rownames("loccode1922") %>%
+  scale()
 ```
 
 
@@ -1451,6 +1465,59 @@ effort1922_long %>%
 
 ```
 
+
+### Occupancy covarates
+
+
+#### Cicadas
+
+```{r cicadas}
+pt19_cicada_ind_byperiod_scaled.df = pt19_cicada_ind_byperiod_scaled %>%
+  as.data.frame(loccode1922 = rownames(.), .) %>%
+  tibble::rownames_to_column()
+names(pt19_cicada_ind_byperiod_scaled.df)[1] = "loccode1922"
+
+pt20_cicada_ind_byperiod_scaled.df = pt20_cicada_ind_byperiod_scaled %>%
+  as.data.frame(loccode1922 = rownames(.), .) %>%
+  tibble::rownames_to_column()
+names(pt20_cicada_ind_byperiod_scaled.df)[1] = "loccode1922"
+
+pt21_cicada_ind_byperiod_scaled.df = pt21_cicada_ind_byperiod_scaled %>%
+  as.data.frame(loccode1922 = rownames(.), .) %>%
+  tibble::rownames_to_column()
+names(pt21_cicada_ind_byperiod_scaled.df)[1] = "loccode1922"
+
+pt22_cicada_ind_byperiod_scaled.df = pt22_cicada_ind_byperiod_scaled %>%
+  as.data.frame(loccode1922 = rownames(.), .) %>%
+  tibble::rownames_to_column()
+names(pt22_cicada_ind_byperiod_scaled.df)[1] = "loccode1922"
+
+cicada1922_sitebysvperiod_list = 
+  list(pt19_cicada_ind_byperiod_scaled.df,
+       pt20_cicada_ind_byperiod_scaled.df,
+       pt21_cicada_ind_byperiod_scaled.df,
+       pt22_cicada_ind_byperiod_scaled.df)
+
+(cicada1922_sitebysvperiod_lj =  
+cicada1922_sitebysvperiod_list %>%
+  Reduce(function(df1, df2)
+    left_join(df1, df2, by = "loccode1922"), .))
+
+(cicadaperiodnames1922 =
+  names(cicada1922_sitebysvperiod_lj)[-1] %>%
+  as_data_frame() %>%
+  separate(value, c("Period", NA, NA)) %>%
+  mutate(Period2 = paste0(Period, 
+                          c(rep(".2019", 4),
+                            rep(".2020", 4),
+                            rep(".2021", 4),
+                            rep(".2022", 4))
+  )))
+
+names(cicada1922_sitebysvperiod_lj)[-1] = 
+    as.character(cicadaperiodnames1922$Period2)
+```
+
 ## Dynamic Occupancy model with effort, year as primary time element
 
 Since I had to summarize detections by site, survey periods are our replicates within year.  Points cannot be used for this because they are a mess to work with.  Eventually, it might be nice to figure out how to use points as replicates and test for survey period effects.  For now I use Chi-Squared tests to show that there is essentially an effect of period on detections with the middle two periods always being best.  There may be a significant Year by survey period interaction.  If you have to choose one period, period 2 is almost always best.
@@ -1523,6 +1590,82 @@ predocc_plot = predicted_occupancy %>%
                 width = 0.2)
 print(predocc_plot)
 predocc_plot + labs(title="Occupancy Probability 2019-2022", 
+                    x="Year", 
+                    y = "Occupancy Probability")+
+   theme_classic() +
+   scale_color_manual(values='#E69F00')
+```
+
+### Model with time measure of effort and Cicada for observation
+
+Model fit is ???.
+
+```{r occcicada}
+library(unmarked)
+
+# remove loccode1922
+umf_eff_cic = unmarkedMultFrame(y = presabs1922_sitesbyperiod[,-1],
+                 numPrimary = 4,
+                 obsCovs = list(effort = 
+                                  effort1922_sitebysvperiod_lj[,-1],
+                                cicadas = 
+                                  cicada1922_sitebysvperiod_lj[,-1])
+)
+
+summary(umf_eff_cic)
+
+dynamic_occ_m2 = colext( psiformula = ~cicadas,
+                     gammaformula = ~1,
+                     epsilonformula = ~1,
+                     pformula = ~effort,
+                     data = umf_eff_cic,
+                     # optim method, leave as "BFGS"
+                     method = "BFGS",
+                     control = list(trace=1, maxit=1e4))
+
+# Mackenzie-Bailey GOF test
+# Simulate capture history data (if model correct). Compare obs X2 to sim X2
+# Must simulate 1000-5000 times for good distribution estimates
+# Likely to take a Very Long Time on large data sets
+# with nsim = 10, takes my Mackbook ~ 60 seconds
+mb.boot2 <- AICcmodavg::mb.gof.test(dynamic_occ_m2,
+                                   nsim = 1000) # Must be much higher than five to be useful
+
+print(mb.boot2, digit.vals = 4, digits.chisq = 4)
+
+summary(dynamic_occ_m2)
+
+# The predicted occupancy probability for each site during each primary survey (year). This is stored in an array within the model object (dynamic_occ_m1@smoothed). The array is 2 (a vector of probabilities for 1. unoccupied and 2. occupied) x 5 (number of primary surveys) x 100 (number of sites).
+
+# Occupancy probability for each of 4 years by site
+
+occu_by_site2 = as.data.frame.matrix(dynamic_occ_m2@smoothed[2,,])
+names(occu_by_site2) = names_count1922$loccode1922
+View(occu_by_site2)
+
+# Mean smoothed occupancy probabilities can be accessed using:
+# dynamic_occ_m1@smoothed.mean, or
+# smoothed(dynamic_occ_m1)
+
+# Calculate SE for derived occupancy predictions using bootstrap, larger B requires longer time
+m2 <- nonparboot(dynamic_occ_m2, 
+                 B = 1000)
+
+# Predicted occupancy in each year (with SE)
+# the "[2,]" calls the occupied estimates,
+# "[1,]" for unoccupied estimates
+predicted_occupancy2 <- data.frame(year = c(2019:2022),
+                             smoothed_occ = smoothed(dynamic_occ_m2)[2,],
+                             SE = m2@smoothed.mean.bsse[2,])
+predocc_plot2 = predicted_occupancy2 %>%
+  ggplot(aes(x = year, y = smoothed_occ)) +
+  geom_line() +
+  geom_point() +
+  geom_errorbar(aes(ymin = smoothed_occ - SE, 
+                    ymax = smoothed_occ + SE),
+                width = 0.2)
+print(predocc_plot2)
+predocc_plot2 + labs(title="Occupancy Probability with Cicadas, 2019-2022", 
                     x="Year", 
                     y = "Occupancy Probability")+
    theme_classic() +
