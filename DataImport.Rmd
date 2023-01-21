@@ -926,20 +926,17 @@ pt19_effort_time_scaled = pt19_effort_time %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
 
-table(pt19$loccode1922, pt19$cicada_index, pt19$svperiod)
+table(pt19$loccode1922, pt19$cicada_index)
 
 pt19_cicada_ind = pt19 %>%
-  select(loccode1922, cicada_index, svperiod) %>%
-  group_by(loccode1922, svperiod) %>%
+  select(loccode1922, cicada_index) %>%
+  group_by(loccode1922) %>%
   summarise(mean_cic_ind = mean(cicada_index))
 
-pt19_cicada_ind_byperiod = pt19_cicada_ind %>%
-  pivot_wider(names_from = svperiod,
-              values_from = mean_cic_ind) 
-
-pt19_cicada_ind_byperiod_scaled = pt19_cicada_ind_byperiod %>%
+pt19_cicada_ind_scaled = pt19_cicada_ind %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
+
 ```
 
 
@@ -1043,18 +1040,14 @@ pt20_effort_time_scaled = pt20_effort_time %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
 
-table(pt20$loccode1922, pt20$cicada_index, pt20$svperiod)
+table(pt20$loccode1922, pt20$cicada_index)
 
 pt20_cicada_ind = pt20 %>%
-  select(loccode1922, cicada_index, svperiod) %>%
-  group_by(loccode1922, svperiod) %>%
+  select(loccode1922, cicada_index) %>%
+  group_by(loccode1922) %>%
   summarise(mean_cic_ind = mean(cicada_index))
 
-pt20_cicada_ind_byperiod = pt20_cicada_ind %>%
-  pivot_wider(names_from = svperiod,
-              values_from = mean_cic_ind) 
-
-pt20_cicada_ind_byperiod_scaled = pt20_cicada_ind_byperiod %>%
+pt20_cicada_ind_scaled = pt20_cicada_ind %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
 
@@ -1063,6 +1056,8 @@ pt20_cicada_ind_byperiod_scaled = pt20_cicada_ind_byperiod %>%
 
 
 #### 2021
+
+Before import into postgis, points21 must have gotten opened in excel and Cicada.count got converted to dates. This had to be corrected.
 
 ```{r combine21}
 names(points21)
@@ -1083,7 +1078,7 @@ points21_fixed = points21%>%
   mutate(Cicada.count = if_else(Cicada.count == "19-Nov",
                                 "11-19", 
                                 Cicada.count)) %>%
-  mutate(Cicada.count = if_else(Cicada.count == "10-June",
+  mutate(Cicada.count = if_else(Cicada.count == "10-Jun",
                                 "6-10", 
                                 Cicada.count))
 
@@ -1167,18 +1162,14 @@ pt21_effort_time_scaled = pt21_effort_time %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
 
-table(pt21$loccode1922, pt21$cicada_index, pt21$svperiod)
+table(pt21$loccode1922, pt21$cicada_index)
 
 pt21_cicada_ind = pt21 %>%
-  select(loccode1922, cicada_index, svperiod) %>%
-  group_by(loccode1922, svperiod) %>%
+  select(loccode1922, cicada_index) %>%
+  group_by(loccode1922) %>%
   summarise(mean_cic_ind = mean(cicada_index))
 
-pt21_cicada_ind_byperiod = pt21_cicada_ind %>%
-  pivot_wider(names_from = svperiod,
-              values_from = mean_cic_ind) 
-
-pt21_cicada_ind_byperiod_scaled = pt21_cicada_ind_byperiod %>%
+pt21_cicada_ind_scaled = pt21_cicada_ind %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
 
@@ -1284,20 +1275,17 @@ pt22_effort_time_scaled = pt22_effort_time %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
 
-table(pt22$loccode1922, pt22$cicada_index, pt22$svperiod)
+table(pt22$loccode1922, pt22$cicada_index)
 
 pt22_cicada_ind = pt22 %>%
-  select(loccode1922, cicada_index, svperiod) %>%
-  group_by(loccode1922, svperiod) %>%
+  select(loccode1922, cicada_index) %>%
+  group_by(loccode1922) %>%
   summarise(mean_cic_ind = mean(cicada_index))
 
-pt22_cicada_ind_byperiod = pt22_cicada_ind %>%
-  pivot_wider(names_from = svperiod,
-              values_from = mean_cic_ind) 
-
-pt22_cicada_ind_byperiod_scaled = pt22_cicada_ind_byperiod %>%
+pt22_cicada_ind_scaled = pt22_cicada_ind %>%
   tibble::column_to_rownames("loccode1922") %>%
   scale()
+
 ```
 
 
@@ -1466,56 +1454,52 @@ effort1922_long %>%
 ```
 
 
-### Occupancy covarates
+### Occupancy covariates
 
 
-#### Cicadas
+#### Cicadas summarized by site
 
 ```{r cicadas}
-pt19_cicada_ind_byperiod_scaled.df = pt19_cicada_ind_byperiod_scaled %>%
+pt19_cicada_ind_scaled.df = pt19_cicada_ind_scaled %>%
   as.data.frame(loccode1922 = rownames(.), .) %>%
   tibble::rownames_to_column()
-names(pt19_cicada_ind_byperiod_scaled.df)[1] = "loccode1922"
+names(pt19_cicada_ind_scaled.df)[1] = "loccode1922"
 
-pt20_cicada_ind_byperiod_scaled.df = pt20_cicada_ind_byperiod_scaled %>%
+pt20_cicada_ind_scaled.df = pt20_cicada_ind_scaled %>%
   as.data.frame(loccode1922 = rownames(.), .) %>%
   tibble::rownames_to_column()
-names(pt20_cicada_ind_byperiod_scaled.df)[1] = "loccode1922"
+names(pt20_cicada_ind_scaled.df)[1] = "loccode1922"
 
-pt21_cicada_ind_byperiod_scaled.df = pt21_cicada_ind_byperiod_scaled %>%
+pt21_cicada_ind_scaled.df = pt21_cicada_ind_scaled %>%
   as.data.frame(loccode1922 = rownames(.), .) %>%
   tibble::rownames_to_column()
-names(pt21_cicada_ind_byperiod_scaled.df)[1] = "loccode1922"
+names(pt21_cicada_ind_scaled.df)[1] = "loccode1922"
 
-pt22_cicada_ind_byperiod_scaled.df = pt22_cicada_ind_byperiod_scaled %>%
+pt22_cicada_ind_scaled.df = pt22_cicada_ind_scaled %>%
   as.data.frame(loccode1922 = rownames(.), .) %>%
   tibble::rownames_to_column()
-names(pt22_cicada_ind_byperiod_scaled.df)[1] = "loccode1922"
+names(pt22_cicada_ind_scaled.df)[1] = "loccode1922"
 
-cicada1922_sitebysvperiod_list = 
-  list(pt19_cicada_ind_byperiod_scaled.df,
-       pt20_cicada_ind_byperiod_scaled.df,
-       pt21_cicada_ind_byperiod_scaled.df,
-       pt22_cicada_ind_byperiod_scaled.df)
+cicada1922_site_list = 
+  list(pt19_cicada_ind_scaled.df,
+       pt20_cicada_ind_scaled.df,
+       pt21_cicada_ind_scaled.df,
+       pt22_cicada_ind_scaled.df)
 
-(cicada1922_sitebysvperiod_lj =  
-cicada1922_sitebysvperiod_list %>%
+(cicada1922_site_lj =  
+cicada1922_site_list %>%
   Reduce(function(df1, df2)
     left_join(df1, df2, by = "loccode1922"), .))
 
-(cicadaperiodnames1922 =
-  names(cicada1922_sitebysvperiod_lj)[-1] %>%
+(cicadanames1922 =
+  names(cicada1922_site_lj)[-1] %>%
   as_data_frame() %>%
-  separate(value, c("Period", NA, NA)) %>%
-  mutate(Period2 = paste0(Period, 
-                          c(rep(".2019", 4),
-                            rep(".2020", 4),
-                            rep(".2021", 4),
-                            rep(".2022", 4))
-  )))
+  separate(value, c("Year", NA, NA), sep = "\\.") %>%
+  mutate(Year2 = paste0(Year, c(".2019", ".2020", ".2021", ".2022")))
+)
 
-names(cicada1922_sitebysvperiod_lj)[-1] = 
-    as.character(cicadaperiodnames1922$Period2)
+names(cicada1922_site_lj)[-1] = 
+    as.character(cicadanames1922$Year2)
 ```
 
 ## Dynamic Occupancy model with effort, year as primary time element
@@ -1604,24 +1588,28 @@ Model fit is ???.
 library(unmarked)
 
 # remove loccode1922
+sc = cicada1922_site_lj
+sc[is.na(sc)] = 0
 umf_eff_cic = unmarkedMultFrame(y = presabs1922_sitesbyperiod[,-1],
                  numPrimary = 4,
                  obsCovs = list(effort = 
-                                  effort1922_sitebysvperiod_lj[,-1],
-                                cicadas = 
-                                  cicada1922_sitebysvperiod_lj[,-1])
+                                  effort1922_sitebysvperiod_lj[,-1]),
+                 # Using more than one row so this is a data.frame not a 
+                 # vector. Only first is used.
+                 siteCovs = sc[, 2:5],
+                 yearlySiteCovs = list(cicada_time =
+                                         sc[, c(2:5)])
 )
 
 summary(umf_eff_cic)
 
-dynamic_occ_m2 = colext( psiformula = ~cicadas,
-                     gammaformula = ~1,
-                     epsilonformula = ~1,
+dynamic_occ_m2 = colext(psiformula = ~mean_cic_ind.2019,
+                     gammaformula = ~cicada_time,
+                     epsilonformula = ~cicada_time,
                      pformula = ~effort,
                      data = umf_eff_cic,
                      # optim method, leave as "BFGS"
-                     method = "BFGS",
-                     control = list(trace=1, maxit=1e4))
+                     method = "BFGS")
 
 # Mackenzie-Bailey GOF test
 # Simulate capture history data (if model correct). Compare obs X2 to sim X2
