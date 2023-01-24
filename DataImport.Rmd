@@ -781,6 +781,9 @@ We have to do it differently, but it is basically the same as 2011.
 
 Survey period and visit number sometimes align, but sometimes do not.  For the years 2019-2022 at least, point key takes into account the visit number which should separate cases where a site is surveyed in two or more parts.
 
+Reconciling MSCP numbers (surveyor designations) with sites of known age
+Cari Lynn:  Seems like the data from 2019-2022 can be combined to match many of the sites from the 2018 model (C2529 + C2530 = CVCA03, C2364 + C2365 + C2366 = PVER05; etc.). CVCA 09, North 160, and Middle Hippy Fire were not in the 2018 model but could potentially be added in. 
+
 ***Errors:***
 
 * 1 test row with no key. This is removed on input.
