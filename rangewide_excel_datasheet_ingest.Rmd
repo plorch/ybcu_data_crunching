@@ -1,0 +1,48 @@
+---
+title: "rangewide_excel_datasheet_ingest"
+author: "Patrick D. lorch"
+date: "2023-01-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+
+
+```{r libs}
+library(readxl)
+
+```
+
+## Header import
+
+Good options
+https://www.r-bloggers.com/2021/06/reading-data-from-excel-files-xlsxlsxcsv-into-r-quick-guide/
+
+Make sure you have the sheet closed before running this.
+
+```{r header}
+headercells = "A1:W7"
+sheet0 = "BlanKForm"
+
+rangewide_files_path = "C:\Users\PatrickLorch\SSRS\Southern Sierra Research Station - Documents\Projects\YBCU - Rangewide Surveys CSWG\Other Entity Data\NM Other Entity\USFS"
+
+file.list = list.files(path = rangewide_files_path, pattern='*.xlsx')
+path.list = file.path(rangewide_files_path, file.list)
+
+
+read_header = function(path = file.list[1], 
+                       sheet = sheet0,
+                       range = headercells,
+                       col_names = F){
+  read_excel(path = file.path(path0, file), sheet, range, col_names)
+}
+
+temp.df.list = lapply(path.list, read_header)
+
+
+```
+
