@@ -14,8 +14,22 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r libs}
 library(readxl)
+library(openxlsx)
+library(dplyr)
+library(tidyr)
+```
+
+## Input variables
+
+```{r variables}
+rangewide_files_path = "C:\Users\PatrickLorch\SSRS\Southern Sierra Research Station - Documents\Projects\YBCU - Rangewide Surveys CSWG\Other Entity Data\NM Other Entity\USFS"
+
+file.list = list.files(path = rangewide_files_path, pattern='*.xlsx')
+path.list = file.path(rangewide_files_path, file.list)
+
 
 ```
+
 
 ## Header import
 
@@ -28,12 +42,7 @@ Make sure you have the sheet closed before running this.
 headercells = "A1:W7"
 sheet0 = "BlanKForm"
 
-rangewide_files_path = "C:\Users\PatrickLorch\SSRS\Southern Sierra Research Station - Documents\Projects\YBCU - Rangewide Surveys CSWG\Other Entity Data\NM Other Entity\USFS"
-
-file.list = list.files(path = rangewide_files_path, pattern='*.xlsx')
-path.list = file.path(rangewide_files_path, file.list)
-
-
+# Functions
 read_header = function(path = file.list[1], 
                        sheet = sheet0,
                        range = headercells,
@@ -41,8 +50,91 @@ read_header = function(path = file.list[1],
   read_excel(path = file.path(path0, file), sheet, range, col_names)
 }
 
-temp.df.list = lapply(path.list, read_header)
+# This maps the data into the right column and renames
+header_extracts = function(header = headers.df.list[[1]]){
+  headers.df = data.frame(SiteName = as.character(header[2,3]),
+                        County = as.character(header[2,11]),
+                        Elevation_m = as.numeric(header[2,18]),
+                        State = as.character(header[2,22]),
+                        USGS_QuadName = as.character(header[3,3]),
+                        CrkRvrWtlndCnynLkName = as.character(header[3,16]),
+                        UTMzone = as.character(header[5,9]),
+                        StartUTM_Easting = as.numeric(header[5,15]),
+                        StartUTM_Northing = as.numeric(header[5,18]),
+                        MagneticDeclinationDeg = as.numeric(header[6,23]),
+                        Datum = as.character(header[6,9]),
+                        StopUTM_Easting = as.numeric(header[6,15]),
+                        StopUTM_Northing = as.numeric(header[6,18]),
+                        SiteSurveyedPrev = as.character(header[7,12]),
+                        PreviousYearName = as.character(header[7,18])
+                     )
+}
+
+# Get list of spreadsheets
+headers.df.list = lapply(path.list, read_header)
+# extract data we need and output list of 1 line dataframes
+headerdata.list = lapply(headers.df.list, header_extracts)
+# Combine rows from list
+headerdata.df = do.call(rbind, headerdata.list)
+
+```
+
+## Survey Points import
+
+
+```{r surveypoints}
+surveycells = "A9:AB50"
+sheet0 = "BlanKForm"
+
+# Functions
+read_survpts = function(path = file.list[1], 
+                       sheet = sheet0,
+                       range = surveycells,
+                       col_names = F){
+  read_excel(path = file.path(path0, file), sheet, range, col_names)
+}
+
+# This maps the data into the right column
+survey_extracts = function(surveys = survpts.df.list[[1]]){
+  surveys = surveys[, 1:6]
+  start = 4
+  skip = 8
+  df.list = list()
+  surveys.list = for(i in 0:4){
+    ind = start + i * skip
+    df.list[[i+1]] = data.frame(SurveyNumber = as.numeric(surveys[ind, 1]),
+               SurveyDate = convertToDateTime(surveys[ind, 4]),
+               Observers = paste(surveys[(ind + 2):(ind + 2 + 4), 1], 
+                                 sep = ", "),
+               SurveyStart = convertToDateTime(as.numeric(surveys[ind, 4]) +
+                                              as.numeric(surveys[ind + 2, 4])),
+               SurveyStop = convertToDateTime(as.numeric(surveys[ind, 4]) + 
+                                              as.numeric(surveys[ind + 4, 4])))
+  }
+  surveys.df = do.call(rbind, surveys.list)
+}
+
+survpts_extracts = function(survpts = survpts.df.list[[1]]){
+  survpts = survpts[, 7:28]
+  survnames = survpts[1:2,]
+  survpts = survpts[-c(1,2),]
+
+  survpts.df = data.frame(
+    
+  )
+}
+
+
+# Get list of spreadsheets
+survpts.df.list = lapply(path.list, read_survpts)
+# extract data we need and output list of 1 line dataframes
+survdata.list = lapply(survpts.df.list, survey_extracts)
+survptdata.list = lapply(survpts.df.list, survpts_extracts)
+# Combine rows from list
+survdata.df = do.call(rbind, survdata.list)
+survptdata.df = do.call(rbind, survptdata.list)
 
 
 ```
+
 
