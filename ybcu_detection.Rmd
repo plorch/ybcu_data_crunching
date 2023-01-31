@@ -1,0 +1,30 @@
+---
+title: "ybcu_detection"
+author: "Patrick D. lorch"
+date: "2023-01-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## History
+
+This model is a general additive model like the one done in 2018 by John Stanek and Shannon McNeil.  That modeling effort settled on model R4 for the final report.  I presume this was done since it was closest to what was promised and made the point that year since restoration is very important.
+
+The best model according to John was model R10.  
+
+glmer(COBPRB ~ ha + Age + nAges +(1|Site) +(1|Year), data = det, family = poisson)
+
+The other closest 3 (according to AIC) had nAges in them and various other factors that are related to the surrounding contiguous area. These are probably highly correlated with nAges.
+
+I suspect that R4 was settled on since the other variables explain variance in detection because they are represent stand age in adjacent areas, and therefor don't add much to the point that stand age matters.
+
+
+## Bring in data
+
+```{r data}
+
+```
+
