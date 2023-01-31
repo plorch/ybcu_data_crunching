@@ -84,6 +84,9 @@ headerdata.df = do.call(rbind, headerdata.list)
 
 ```{r surveypoints}
 surveycells = "A9:AB50"
+# Make sure to run the header part above to reset this
+surveystates = headerdata.df$State
+surveysitenames = headerdata.df$SiteName
 sheet0 = "BlanKForm"
 
 # Functions
@@ -95,33 +98,44 @@ read_survpts = function(path = file.list[1],
 }
 
 # This maps the data into the right column
-survey_extracts = function(surveys = survpts.df.list[[1]]){
+
+survey_extracts = function(surveys = survpts.df.list[[1]]) {
   surveys = surveys[, 1:6]
   start = 4
   skip = 8
   df.list = list()
-  surveys.list = for(i in 0:4){
+  surveys.list = for (i in 0:4) {
     ind = start + i * skip
-    df.list[[i+1]] = data.frame(SurveyNumber = as.numeric(surveys[ind, 1]),
-               SurveyDate = convertToDateTime(surveys[ind, 4]),
-               Observers = paste(surveys[(ind + 2):(ind + 2 + 4), 1], 
-                                 sep = ", "),
-               SurveyStart = convertToDateTime(as.numeric(surveys[ind, 4]) +
-                                              as.numeric(surveys[ind + 2, 4])),
-               SurveyStop = convertToDateTime(as.numeric(surveys[ind, 4]) + 
-                                              as.numeric(surveys[ind + 4, 4])))
+    df.list[[i + 1]] = data.frame(
+      SurveyNumber = as.numeric(surveys[ind, 1]),
+      SurveyDate = convertToDateTime(surveys[ind, 4]),
+      Observers = paste(surveys[(ind + 2):(ind + 2 + 4), 1],
+                        sep = ", "),
+      SurveyStart = convertToDateTime(as.numeric(surveys[ind, 4]) +
+                                        as.numeric(surveys[ind + 2, 4])),
+      SurveyStop = convertToDateTime(as.numeric(surveys[ind, 4]) +
+                                       as.numeric(surveys[ind + 4, 4]))
+    )
+    return(df.list[[1]])
   }
   surveys.df = do.call(rbind, surveys.list)
 }
 
-survpts_extracts = function(survpts = survpts.df.list[[1]]){
-  survpts = survpts[, 7:28]
-  survnames = survpts[1:2,]
-  survpts = survpts[-c(1,2),]
+survpts_extracts = function(survpts = survpts.df.list[[1]],
+                            State = as.list(surveystates)[[1]], 
+                            SiteName = as.list(surveysitenames)[[1]]){
+  survnames = c("SurveyNumber", "YBCU_No", "DetectionTime", "DetectionMethod",
+                "DetectionType", "VocalizationType", "NumberOfPlaybacks",
+                "BehaviorObserved", "UTM_E", NA, "UTM_N", NA, "Distance_m",
+                "Bearing", "CorrectedUTM_E", "CorrectedUTM_N", NA,
+                "TrigBearing", "E_correction", "N_correction",
+                "CorrectedUTM_E_2", "CorrectedUTM_N_2", "State", "Sitename")
+  survpts = survpts[-c(1,2), 7:28]
 
-  survpts.df = data.frame(
-    
-  )
+  survpts.df = data.frame(survpts, State, SiteName)
+  names(survpts.df) = survnames
+  
+  return(survpts.df)
 }
 
 
@@ -129,12 +143,17 @@ survpts_extracts = function(survpts = survpts.df.list[[1]]){
 survpts.df.list = lapply(path.list, read_survpts)
 # extract data we need and output list of 1 line dataframes
 survdata.list = lapply(survpts.df.list, survey_extracts)
+survdata.list = mapply(append, survdata.list, surveystates, SIMPLIFY = F)
+survdata.list = mapply(append, survdata.list, surveysitenames, SIMPLIFY = F)
+
 survptdata.list = lapply(survpts.df.list, survpts_extracts)
 # Combine rows from list
-survdata.df = do.call(rbind, survdata.list)
+survdata.df = as.data.frame(do.call(rbind, survdata.list))
+names(survdata.df)[6:7] = c("State", "SiteName")
+
 survptdata.df = do.call(rbind, survptdata.list)
 
-
+# Need to get State and SiteName into list before making data frames
 ```
 
 
