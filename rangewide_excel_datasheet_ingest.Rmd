@@ -22,9 +22,14 @@ library(readxl)
 library(openxlsx)
 library(dplyr)
 library(tidyr)
+library(purrr)
 ```
 
 ## Input variables
+
+You want to run one of the path setting variables, then run the file.list and path.list steps below for each directory.
+
+You may need to replace "\" with "/" in the path name if you use Copy as path on windows to locate directory with the .xlsx files in them for each Other entity.
 
 ```{r variables}
 rangewide_files_path = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/YBCU - Rangewide Surveys CSWG/Other Entity Data/NM Other Entity/USFS"
@@ -37,23 +42,14 @@ rangewide_files_path = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Stat
 
 file.list = list.files(path = rangewide_files_path, pattern='*.xlsx')
 path.list = file.path(rangewide_files_path, file.list)
-
-
 ```
 
+## Functions
 
-## Header import
+These should only need to be sourced once.
 
-Good options
-https://www.r-bloggers.com/2021/06/reading-data-from-excel-files-xlsxlsxcsv-into-r-quick-guide/
-
-Make sure you have the sheet closed before running this.
-
-```{r header}
-headercells = "A1:W7"
-sheet0 = "BlanKForm"
-
-# Functions
+```{r functions}
+# Headers
 read_header = function(path = path.list, 
                        sheet = sheet0,
                        range = headercells,
@@ -81,26 +77,7 @@ header_extracts = function(header = headers.df.list){
                      )
 }
 
-# Get list of spreadsheets
-headers.df.list = lapply(path.list, read_header)
-# extract data we need and output list of 1 line dataframes
-headerdata.list = lapply(headers.df.list, header_extracts)
-# Combine rows from list
-headerdata.df = do.call(rbind, headerdata.list)
-write.csv(headerdata.df, file.path(rangewide_files_path, "headerdata.csv"))
-```
-
-## Survey Points import
-
-
-```{r surveypoints}
-surveycells = "A9:AB50"
-# Make sure to run the header part above to reset this
-surveystates = headerdata.df$State
-surveysitenames = headerdata.df$SiteName
-sheet0 = "BlanKForm"
-
-# Functions
+# Survey and Survey point data
 read_survpts = function(path = path.list, 
                        sheet = sheet0,
                        range = surveycells,
@@ -108,8 +85,7 @@ read_survpts = function(path = path.list,
   read_excel(path, sheet, range, col_names)
 }
 
-# This maps the data into the right column
-
+# Surveys
 survey_extracts = function(surveys = survpts.df.list) {
   surveys = surveys[, 1:6]
   start = 4
@@ -137,6 +113,7 @@ survey_extracts = function(surveys = survpts.df.list) {
 
 }
 
+# Survey Points
 survpts_extracts = function(survpts = survpts.df.list){
   survnames = c("SurveyNumber", "YBCU_No", "DetectionTime", "DetectionMethod",
                 "DetectionType", "VocalizationType", "NumberOfPlaybacks",
@@ -152,6 +129,37 @@ survpts_extracts = function(survpts = survpts.df.list){
   return(survpts.df)
 }
 
+```
+
+
+## Header import
+
+Good options
+https://www.r-bloggers.com/2021/06/reading-data-from-excel-files-xlsxlsxcsv-into-r-quick-guide/
+
+Make sure you have the sheet closed before running this.
+
+```{r header}
+headercells = "A1:W7"
+sheet0 = "BlanKForm"
+
+# Get list of spreadsheets
+headers.df.list = lapply(path.list, read_header)
+# extract data we need and output list of 1 line dataframes
+headerdata.list = lapply(headers.df.list, header_extracts)
+# Combine rows from list
+headerdata.df = do.call(rbind, headerdata.list)
+write.csv(headerdata.df, file.path(rangewide_files_path, "headerdata.csv"))
+```
+
+## Surveys
+
+```{r surveys}
+surveycells = "A9:AB50"
+# Make sure to run the header part above to reset this
+surveystates = headerdata.df$State
+surveysitenames = headerdata.df$SiteName
+sheet0 = "BlanKForm"
 
 # Get list of data.frames
 # extract data we need and output list of 1 line dataframes
@@ -165,16 +173,30 @@ survdata.list = mapply(cbind, survdata.list,
 survdata.df = do.call(rbind, survdata.list)
 write.csv(survdata.df, file.path(rangewide_files_path, "survdata.csv"))
 
-# Repeat for points
+```
+
+
+## Survey Points import
+
+
+```{r surveypoints}
+surveycells = "A9:AB50"
+# Make sure to run the header part above to reset this
+surveystates = headerdata.df$State
+surveysitenames = headerdata.df$SiteName
+sheet0 = "BlanKForm"
+
+# Get list of data.frames
+# extract data we need and output list of 1 line dataframes
 survpts.df.list = lapply(path.list, read_survpts)
 survpts.df.list = mapply(cbind, survpts.df.list,
                          State = surveystates,
                          SiteName = surveysitenames,
                          SIMPLIFY = F)
 survptdata.list = lapply(survpts.df.list, survpts_extracts)
+# Combine rows from list
 survptdata.df = do.call(rbind, survptdata.list)
 write.csv(survptdata.df, file.path(rangewide_files_path, "survptdata.csv"))
 
 ```
-
 
