@@ -8,6 +8,11 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+## Todo
+
+* fix survey conversion (see comment around line 154)
+* Get rid of blank rows
+* Get to run on dir with multiple files and check
 
 ## Libraries
 
@@ -22,7 +27,13 @@ library(tidyr)
 ## Input variables
 
 ```{r variables}
-rangewide_files_path = "C:\Users\PatrickLorch\SSRS\Southern Sierra Research Station - Documents\Projects\YBCU - Rangewide Surveys CSWG\Other Entity Data\NM Other Entity\USFS"
+rangewide_files_path = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/YBCU - Rangewide Surveys CSWG/Other Entity Data/NM Other Entity/USFS"
+
+# NM BdA NWR
+rangewide_files_path = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/YBCU - Rangewide Surveys CSWG/Other Entity Data/NM Other Entity/BdA NWR/Survey Forms"
+
+# BLM - Cody Howard
+rangewide_files_path = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/YBCU - Rangewide Surveys CSWG/Other Entity Data/NM Other Entity/BLM - Cody Howard"
 
 file.list = list.files(path = rangewide_files_path, pattern='*.xlsx')
 path.list = file.path(rangewide_files_path, file.list)
@@ -43,15 +54,15 @@ headercells = "A1:W7"
 sheet0 = "BlanKForm"
 
 # Functions
-read_header = function(path = file.list[1], 
+read_header = function(path = path.list, 
                        sheet = sheet0,
                        range = headercells,
                        col_names = F){
-  read_excel(path = file.path(path0, file), sheet, range, col_names)
+  read_excel(path, sheet, range, col_names)
 }
 
 # This maps the data into the right column and renames
-header_extracts = function(header = headers.df.list[[1]]){
+header_extracts = function(header = headers.df.list){
   headers.df = data.frame(SiteName = as.character(header[2,3]),
                         County = as.character(header[2,11]),
                         Elevation_m = as.numeric(header[2,18]),
@@ -76,7 +87,7 @@ headers.df.list = lapply(path.list, read_header)
 headerdata.list = lapply(headers.df.list, header_extracts)
 # Combine rows from list
 headerdata.df = do.call(rbind, headerdata.list)
-
+write.csv(headerdata.df, file.path(rangewide_files_path, "headerdata.csv"))
 ```
 
 ## Survey Points import
@@ -90,16 +101,16 @@ surveysitenames = headerdata.df$SiteName
 sheet0 = "BlanKForm"
 
 # Functions
-read_survpts = function(path = file.list[1], 
+read_survpts = function(path = path.list, 
                        sheet = sheet0,
                        range = surveycells,
                        col_names = F){
-  read_excel(path = file.path(path0, file), sheet, range, col_names)
+  read_excel(path, sheet, range, col_names)
 }
 
 # This maps the data into the right column
 
-survey_extracts = function(surveys = survpts.df.list[[1]]) {
+survey_extracts = function(surveys = survpts.df.list) {
   surveys = surveys[, 1:6]
   start = 4
   skip = 8
@@ -109,51 +120,61 @@ survey_extracts = function(surveys = survpts.df.list[[1]]) {
     df.list[[i + 1]] = data.frame(
       SurveyNumber = as.numeric(surveys[ind, 1]),
       SurveyDate = convertToDateTime(surveys[ind, 4]),
-      Observers = paste(surveys[(ind + 2):(ind + 2 + 4), 1],
-                        sep = ", "),
+      Observers = paste(surveys[(ind + 2), 1],
+                        surveys[(ind + 3), 1],
+                        surveys[(ind + 4), 1],
+                        surveys[(ind + 5), 1],
+                        surveys[(ind + 6), 1], 
+                        sep = "|"),
       SurveyStart = convertToDateTime(as.numeric(surveys[ind, 4]) +
                                         as.numeric(surveys[ind + 2, 4])),
       SurveyStop = convertToDateTime(as.numeric(surveys[ind, 4]) +
                                        as.numeric(surveys[ind + 4, 4]))
     )
-    return(df.list[[1]])
-  }
-  surveys.df = do.call(rbind, surveys.list)
+    return(df.list)
+   }
+  return(data.frame(surveys.list))
+
 }
 
-survpts_extracts = function(survpts = survpts.df.list[[1]],
-                            State = as.list(surveystates)[[1]], 
-                            SiteName = as.list(surveysitenames)[[1]]){
+survpts_extracts = function(survpts = survpts.df.list){
   survnames = c("SurveyNumber", "YBCU_No", "DetectionTime", "DetectionMethod",
                 "DetectionType", "VocalizationType", "NumberOfPlaybacks",
                 "BehaviorObserved", "UTM_E", NA, "UTM_N", NA, "Distance_m",
                 "Bearing", "CorrectedUTM_E", "CorrectedUTM_N", NA,
                 "TrigBearing", "E_correction", "N_correction",
                 "CorrectedUTM_E_2", "CorrectedUTM_N_2", "State", "Sitename")
-  survpts = survpts[-c(1,2), 7:28]
+  survpts = survpts[-c(1,2), 7:30]
 
-  survpts.df = data.frame(survpts, State, SiteName)
+  survpts.df = data.frame(survpts)
   names(survpts.df) = survnames
   
   return(survpts.df)
 }
 
 
-# Get list of spreadsheets
-survpts.df.list = lapply(path.list, read_survpts)
+# Get list of data.frames
 # extract data we need and output list of 1 line dataframes
 survdata.list = lapply(survpts.df.list, survey_extracts)
-survdata.list = mapply(append, survdata.list, surveystates, SIMPLIFY = F)
-survdata.list = mapply(append, survdata.list, surveysitenames, SIMPLIFY = F)
-
-survptdata.list = lapply(survpts.df.list, survpts_extracts)
+survdata.list = purrr::list_flatten(survdata.list)
+survdata.list = mapply(cbind, survdata.list, 
+                       State = surveystates,
+                       SiteName = surveysitenames, 
+                       SIMPLIFY = F)
 # Combine rows from list
-survdata.df = as.data.frame(do.call(rbind, survdata.list))
-names(survdata.df)[6:7] = c("State", "SiteName")
+survdata.df = do.call(rbind, survdata.list)
+write.csv(survdata.df, file.path(rangewide_files_path, "survdata.csv"))
 
+# Repeat for points
+survpts.df.list = lapply(path.list, read_survpts)
+survpts.df.list = mapply(cbind, survpts.df.list,
+                         State = surveystates,
+                         SiteName = surveysitenames,
+                         SIMPLIFY = F)
+survptdata.list = lapply(survpts.df.list, survpts_extracts)
 survptdata.df = do.call(rbind, survptdata.list)
+write.csv(survptdata.df, file.path(rangewide_files_path, "survptdata.csv"))
 
-# Need to get State and SiteName into list before making data frames
 ```
 
 
