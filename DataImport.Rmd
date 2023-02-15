@@ -785,7 +785,7 @@ Reconciling MSCP numbers (surveyor designations) with sites of known age:
 
 Cari Lynn:  Seems like the data from 2019-2022 can be combined to match many of the sites from the 2018 model (C2529 + C2530 = CVCA03, C2364 + C2365 + C2366 = PVER05; etc.). CVCA 09, North 160, and Middle Hippy Fire were not in the 2018 model but could potentially be added in. 
 
-Ari Lynn will get me a list to crosswalk the sites. This site crosswalk will be use in ybcu_detection.Rmd first
+Cari Lynn will get me a list to crosswalk the sites. This site crosswalk will be used in ybcu_detection.Rmd first.
 
 ***Errors:***
 
