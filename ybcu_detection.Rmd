@@ -131,9 +131,10 @@ table(Trans19_sub$loccode1922)
 
 codeconvert = Trans19_sub %>%
   select(Site, loccode1922) %>%
-  distinct()
+  distinct() %>%
+  add_row(Site = "CNN160", loccode1922 = "C2740")
 
-loccodes = unique(Trans19_sub$loccode1922)
+loccodes = c(unique(Trans19_sub$loccode1922), "C2740")
 
 # Get variables from pre-2019 surveys and add in some for new sites
 detvars = det %>%
@@ -144,15 +145,14 @@ detvars = det %>%
 # Add lines for new sites not in the pre-2019 data set
   # At this stage, we are unsure how to use cha.  the sites have started to merge over the whole span of the study
 
-  add_row(Site = "CNHFM", Age = 1, contig = 1, big = 0, ha = 49.26, 
-          cha = 174.53, cha2 = 174.53, inc = 1, youngest = as.factor(1), 
-          nAges = 5) %>%
-  add_row(Site = "CNHFN", Age = 5, contig = 1, big = 0, ha = 37.86, 
-          cha = 174.53, cha2 = 174.53, inc = 1, youngest =  as.factor(1), 
-          nAges = 5) %>%
-  add_row(Site = "CVCA09", Age = 1, contig = 1, big = 0, ha = 31.25, 
-          cha = 174.53, cha2 = 174.53, inc = 1, youngest =  as.factor(1), 
-          nAges = 5) %>%
+  add_row(Site = "CNHFM", Age = 1, ha = 49.26, 
+          inc = 1) %>%
+  add_row(Site = "CNHFN", Age = 5, ha = 37.86,
+          inc = 1) %>%
+  add_row(Site = "CVCA09", Age = 1, ha = 31.25,
+          inc = 1) %>%
+  add_row(Site = "CNN160", Age = 1, ha = 63.92,
+          inc = 0) %>%
   mutate(Age19 = Age + 1,
          Age20 = Age + 2,
          Age21 = Age + 3,
