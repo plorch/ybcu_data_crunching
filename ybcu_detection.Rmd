@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This model is a general additive model like the one done in 2018 by John Stanek and Shannon McNeil.  That modeling effort settled on model R4 for the final report.  I presume this was done since it was closest to what was promised and made the point that year since restoration is very important.
 
-The best model according to John was model R10.  
+The best model according to John, pre-2019 was model R10.  
 
 glmer(COBPRB ~ ha + Age + nAges +(1|Site) +(1|Year), data = det, family = poisson)
 
@@ -22,9 +22,349 @@ The other closest 3 (according to AIC) had nAges in them and various other facto
 I suspect that R4 was settled on since the other variables explain variance in detection because they are represent stand age in adjacent areas, and therefor don't add much to the point that stand age matters.
 
 
+## Packages and functions
+```{r functions}
+library(lme4)       # for glmer
+library(car)
+library(MASS)
+library(MuMIn)   # for AICc function, R2 (r.squaredGLMM(R4))
+library(dplyr)
+library(tidyr)
+library(AICcmodavg)
+
+#  library(AED)  #This package is no longer available by Highstat Statistics, 
+#     It is a set of functions used in data visualization (such as corvif() below) and exploration
+# John copied the AED functions into a new file and we use it to call the functions
+if(!exists("Pre2018Model/AED_functions.R", mode="function")) source("Pre2018Model/AED_functions.R")
+
+### to plot figures
+library(jtools)
+library(ggplot2)
+library(sjstats)
+library(sjPlot)
+
+```
+
+
 ## Bring in data
 
+Data Description:
+* Area (factor)
+* Site (factor)
+* Year (factor)
+* Age (of the patch in years since planted, integer)
+* dph (detections per hectare, numeric)
+* contig (is the patch contiguous with another patch?, integer)
+* big (is the patch within a large planted area (>100 ha)?, integer)
+* svdets (number of survey detections of cuckoos, integer)
+* nests (number of nests found, integer)
+* ha (size of the patch of that age in hectares, numeric)
+* cha (size of the contiguous patch, numeric)
+* cha2 (size of the contiguous patch - treating PVER as 1 contiguous patch, numeric)
+* inc (include in analysis? 1=yes, factor)
+* youngest (is this patch the youngest patch around?, factor)
+* nAges (number of different ages of patches within the contiguous patch, integer)
+* nAges2 (nAges - but treat ages > 5 years as the same age, integer)
+* tp20h (estimated territories per 20 hectares)
+* PO PR CO (possible, probable and confirmed breeding territories, integer)
+* ptd (probable territory density: (PR + CO only)/ha * 20
+
+
 ```{r data}
+
+#original dataset supplied by Shannon McNeil, SSRS
+det0 = data.frame(read.table("Pre2018Model/tphByAge2.txt",
+                             header=TRUE,
+                             as.is=TRUE))
+det = det0 %>%
+  filter(ptd > -1, (is.na(note) | note != "presv")) %>%
+  mutate(youngest = factor(youngest),
+         COBPRB = CO + PR)
+# tdet = subset(det, (ptd>-1) & (is.na(note) | (note != "presv")))
+# det$youngest = factor(det$youngest)
+# det$COBPRB = det$CO + det$PR
+
+str(det)
+summary(det)
+table(det$Site)
+
+dotchart(det$ha, main = "area (ha)")
+dotchart(det$Age, main = "age")
+dotchart(det$svdets, main = "survey detections")
+dotchart(det$cha2, main = "contiguous area size")
+dotchart(det$COBPRB, main = "counts of COB+PRB")
+
+
+hist(det$ha, labels = TRUE, main = "area (ha)")
+hist(det$Age, labels = TRUE, main = "age")
+hist(det$cha2, labels = TRUE, main = "Continuous Ha")
+hist(det$nAges, labels = TRUE, main = "nAges")
+hist(det$COBPRB, labels = TRUE, main = "COBPRB")
+boxplot(det$COBPRB)
+
+```
+
+
+## Matching up 2019-2022 data to older data
+
+Cari Lynn developed this table to relate MSCP Section numbers to sites used in previous analyses.
+
+The Trans19_sub is the data for just the SiteCodes in the 2018 analysis.  It gives a list of SurveyKeys that could be used to summarize data from pt19, pt20, pt21, and pt22.
+
+```{r matching}
+
+Transects2019_05Jan23 = read_excel("C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/LCR YBCU/Data/2019-2022 Transects for analysis/2019/Transects2019_05Jan23.xls")
+Trans19_sub = Transects2019_05Jan23 %>%
+  filter(SiteCode %in% 
+           c("CNCR", "CNHF", "CVP1", "CVP2", "CVP3", "CVP7", "CVP8",
+             "PVP1", "PVP2", "PVP3", "PVP4", "PVP5",
+             "PVP6", "PVP7", "PVP8")) %>%
+  separate("SurveyKey",
+           c("year", "species","loccode1922"),
+           extra = 'drop',
+           remove = F) %>%
+  select(-year, -species)
+table(Trans19_sub$loccode1922)
+codeconvert = Trans19_sub %>%
+  select(SiteCode, loccode1922) %>%
+  distinct()
+det_sites = unique(det$Site)
+codeconvert$SiteCode
+# Manually assign names that will match the pre-2019 data
+renames = det_sites[c(11, 10, 15, 14, 14, 13, 14, 13, 12, 12, 13,
+            9, 5, 1, 1, 4, 6, 6, 15, 16, 3, 7,
+            8, 10, 4, 8)]
+data.frame(codes = codeconvert$SiteCode, renames)
+codeconvert$Site = renames
+codeconvert$Site[14] = "CNCRS"
+  
+loccodes = unique(Trans19_sub$loccode1922)
+detvars = det %>%
+  select(Site, Year, Age, contig, big, ha, cha, cha2, inc, youngest,
+         nAges) %>%
+  filter(Year == 2018) %>%
+  select(-Year) %>%
+  mutate(Age19 = Age + 1,
+         Age20 = Age + 2,
+         Age21 = Age + 3,
+         Age22 = Age + 4)
+
+
+pt19_det_by_site = pt19_sbsp %>%
+  filter(loccode1922 %in% loccodes) %>%
+  mutate(detections = rowSums(.[2:5])) %>%
+  left_join(codeconvert) %>%
+  select(loccode1922, detections, Site) %>%
+  group_by(Site) %>%
+  summarise(svdets = sum(detections)) %>%
+  mutate(Year = 2019) %>%
+  left_join(select(detvars, 
+                   -c("Age", "Age20", "Age21", "Age22")),
+                   by = "Site") %>%
+  rename(Age = Age19) %>%
+  mutate(dph = svdets / ha)
+pt20_det_by_site = pt20_sbsp %>%
+  filter(loccode1922 %in% loccodes) %>%
+  mutate(detections = rowSums(.[2:5])) %>%
+  left_join(codeconvert) %>%
+  select(loccode1922, detections, Site) %>%
+  group_by(Site)%>%
+  summarise(svdets = sum(detections)) %>%
+  mutate(Year = 2020) %>%
+  left_join(select(detvars, 
+                   -c("Age", "Age19", "Age21", "Age22")),
+                   by = "Site") %>%
+  rename(Age = Age20) %>%
+  mutate(dph = svdets / ha)
+pt21_det_by_site = pt21_sbsp %>%
+  filter(loccode1922 %in% loccodes) %>%
+  mutate(detections = rowSums(.[2:5])) %>%
+  left_join(codeconvert) %>%
+  select(loccode1922, detections, Site) %>%
+  group_by(Site)%>%
+  summarise(svdets = sum(detections)) %>%
+  mutate(Year = 2021) %>%
+  left_join(select(detvars, 
+                   -c("Age", "Age19", "Age20", "Age22")),
+                   by = "Site") %>%
+  rename(Age = Age21) %>%
+  mutate(dph = svdets / ha)
+pt22_det_by_site = pt22_sbsp %>%
+  filter(loccode1922 %in% loccodes) %>%
+  mutate(detections = rowSums(.[2:5])) %>%
+  left_join(codeconvert) %>%
+  select(loccode1922, detections, Site) %>%
+  group_by(Site)%>%
+  summarise(svdets = sum(detections)) %>%
+  mutate(Year = 2022) %>%
+  left_join(select(detvars, 
+                   -c("Age", "Age19", "Age20", "Age21")),
+                   by = "Site") %>%
+  rename(Age = Age22) %>%
+  mutate(dph = svdets / ha)
+
+det1922 = bind_rows(pt19_det_by_site, 
+                    pt20_det_by_site,
+                    pt21_det_by_site,
+                    pt22_det_by_site)
+detAll = bind_rows(det, det1922)
+write.csv(detAll, "det_08_22.csv")
+
+```
+
+## Modeling detections
+
+Since we did not count territories, I checked to see if svdets and COBPRB are correlated and they are highly correlated(r = 0.92).  If we want to predict territories from stand age, we can use the regression from the pre-2019 data.
+
+```{r detections}
+plot(detAll$svdets, detAll$COBPRB)
+cor.test(detAll$svdets, detAll$COBPRB)
+detTerr.lm = lm(detAll$COBPRB~detAll$svdets)
+abline(detTerr.lm)
+# predictions between 1-102
+detTerr.lm.pred = predict(detTerr.lm)
+
+## Rerescaling of cha2 variable leads to exact same results and removes warnings,
+#     but rescaling adds difficulty in interpreting results, analyzed as w/o rescaling as the results are the same either way
+# I think I have some other version of the scale command loaded
+# detAll$cha3 = scale(detAll$cha2)
+detAll$cha3 = (detAll$cha2 - mean(detAll$cha2)) / sd(detAll$cha2)
+
+#data visualization plot - AED functions used here
+Z = cbind(detAll$svdets, # potential response variable
+           detAll$dph, # potential response variable
+           detAll$Year, # potential predictor variables
+           detAll$ha, # potential predictor variables
+           detAll$Age, # potential predictor variables
+           detAll$cha2, # potential predictor variables
+           detAll$cha3, # potential predictor variables
+           detAll$nAges,# potential predictor variables
+           detAll$youngest)# potential predictor variables
+colnames(Z) = c("svdets", "dph", "Year", "ha", "Age", "cha2", "cha3",
+               "nAges", "youngest")  # no spaces in col names
+pairs(Z, lower.panel=panel.smooth2,upper.panel=panel.cor,diag.panel=panel.hist);    #pairwise scatterplots and correlation coefficients to examine for colinearity
+
+#check for correlation and VIF - A VIF less than 3 is good. 
+# Cannot include both of pair that are correlated 100% like cha2 and cha3
+corvif(Z[,c(-1, -2, -6, -9)])   # from AED script file, gets correlation coefficients between pairs and VIF for each 
+
+# These are equivalent of R4, R10, R2, R1, and R9 using COBPRB and pre-2019 data
+#   So R35 is global model and removing items did not improve AIC
+R32  = glmer(svdets ~ ha + Age +(1|Site)+(1|Year), data = detAll, family = poisson)
+R33  = glmer(svdets ~ ha + Age + nAges +(1|Site) +(1|Year), data = detAll, family = poisson)
+R34  = glmer(svdets ~ ha + Age + cha3 + nAges +(1|Site)+(1|Year), data = detAll, family = poisson)
+R35  = glmer(svdets ~ ha + Age + cha3 + nAges + youngest +(1|Site)+(1|Year), data = detAll, family = poisson)
+R36  = glmer(svdets ~ ha + Age + nAges + youngest +(1|Site)+(1|Year), data = detAll, family = poisson)
+
+models = list("R32" = R32, "R33" = R33, "R34" = R34, "R35" = R35, "R36" = R36)
+
+# Display a table of Model#, AIC, delta AIC, & Akaike wt
+aictab(models)
+
+summary(R35)
+#Residuals look pretty good
+qqnorm(residuals(R35))
+
+#Overdispersion result from model 35: 1.949482 greater than 1, so overdispersion
+E1 <- residuals(R35)
+p1 <- length(fixef(R35)) + 1
+(Overdisp1 <- sum(E1^2) / (nrow(detAll) - p1))
+
+#Checking for Deviance Residual GOF, a check for overdispersion
+(phi <- sum(resid(R35, type = "pearson")^2) / df.residual(R35))
+# 1.77147 -  data is overdispersed
+
+#Residual diagnostic plots
+op <- par(mfrow=c(2,3),mar=c(5,4,1,2))
+E<-resid(R35)
+fit <-fitted(R35)
+hist(E,xlab="Residuals",main="")   #histogram to check for normality
+qqnorm(E)                           #QQ plot to check for normality
+plot(fit,E, main="Residuals vs. Fitted Values", ylab="Residual", xlab="Fitted values")    #fitted vs residuals to check homogenaity/heteroskedacity - look for patterns
+plot(detAll$ha,E,xlab="ha",ylab="Residuals")                  #residuals vs each explanatory variable to check for independence
+plot(detAll$Age,E,xlab="age",ylab="Residuals")                #residuals vs each explanatory variable to check for independence
+plot(detAll$nAge,E,xlab="n age",ylab="Residuals")             #residuals vs each explanatory variable to check for independence
+par(op)
+
+# Looking at the various intercept values for random effect variables
+coef(R35)
+coefs <-coef(R35)$Site[,"(Intercept)"]
+plot(coefs)
+boxplot(coefs)
+
+coefs <-coef(R35)$Year[,"(Intercept)"]
+plot(coefs)
+boxplot(coefs)
+
+
+# 
+plot_model(R35, type = "pred", terms = c("Age", "ha"))
+plot_model(R35, type = "pred", terms = c("Age", "cha3"))
+plot_model(R35, type = "pred", terms = c("Age", "nAges"))
+plot_model(R35, type = "pred", terms = c("Age", "youngest"))
+```
+
+## Detections per hectare
+
+Uses lmer not glmer, since it says you should when you try to use more appropriate distributions than Poisson.
+
+```{r dph}
+R37  = lmer(dph ~ Age + (1|Site) + (1|Year), 
+           data = detAll)
+R38  = lmer(dph ~ Age + nAges + (1|Site) + (1|Year), 
+             data = detAll)
+R39  = lmer(dph ~ Age + cha3 + nAges + (1|Site) + (1|Year), 
+             data = detAll)
+R40  = lmer(dph ~ Age + cha3 + nAges + youngest + (1|Site) + (1|Year), 
+             data = detAll)
+R41  = lmer(dph ~ Age + nAges + youngest + (1|Site) + (1|Year), 
+             data = detAll)
+
+models_dph = c("R37" = R37, "R38" = R38, "R39" = R39, "R40" = R40, "R41" = R41)
+
+# Display a table of Model#, AIC, delta AIC, & Akaike wt
+aictab(models_dph)
+
+summary(R39)
+#Residuals look pretty good
+qqnorm(residuals(R39))
+
+#Overdispersion result from model 39: 0.02020889 less than 1, so underdispersion
+E1 <- residuals(R39)
+p1 <- length(fixef(R39)) + 1
+(Overdisp1 <- sum(E1^2) / (nrow(detAll) - p1))
+
+
+#Checking for Deviance Residual GOF, a check for overdispersion
+(phi <- sum(resid(R39, type = "pearson")^2) / df.residual(R39))
+# 0.02046309 -  data is underdispersed
+
+#Residual diagnostic plots
+op <- par(mfrow=c(2,3),mar=c(5,4,1,2))
+E<-resid(R39)
+fit <-fitted(R39)
+hist(E,xlab="Residuals",main="")   #histogram to check for normality
+qqnorm(E)                           #QQ plot to check for normality
+plot(fit,E, main="Residuals vs. Fitted Values", ylab="Residual", xlab="Fitted values")    #fitted vs residuals to check homogenaity/heteroskedacity - look for patterns
+plot(detAll$Age,E,xlab="age",ylab="Residuals")                #residuals vs each explanatory variable to check for independence
+plot(detAll$nAge,E,xlab="n age",ylab="Residuals")             #residuals vs each explanatory variable to check for independence
+par(op)
+
+# Looking at the various intercept values for random effect variables
+coef(R39)
+coefs <-coef(R39)$Site[,"(Intercept)"]
+plot(coefs)
+boxplot(coefs)
+
+coefs <-coef(R39)$Year[,"(Intercept)"]
+plot(coefs)
+boxplot(coefs)
+
+
+# 
+plot_model(R39, type = "pred", terms = c("Age", "cha3"))
+plot_model(R39, type = "pred", terms = c("Age", "nAges"))
+
 
 ```
 
