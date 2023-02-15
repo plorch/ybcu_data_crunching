@@ -32,6 +32,7 @@ You want to run one of the path setting variables, then run the file.list and pa
 You may need to replace "\" with "/" in the path name if you use Copy as path on windows to locate directory with the .xlsx files in them for each Other entity.
 
 ```{r variables}
+# USFS
 rangewide_files_path = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/YBCU - Rangewide Surveys CSWG/Other Entity Data/NM Other Entity/USFS"
 
 # NM BdA NWR
@@ -39,6 +40,16 @@ rangewide_files_path = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Stat
 
 # BLM - Cody Howard
 rangewide_files_path = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/YBCU - Rangewide Surveys CSWG/Other Entity Data/NM Other Entity/BLM - Cody Howard"
+
+# Ecosphere
+rangewide_files_path = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/YBCU - Rangewide Surveys CSWG/Other Entity Data/NM Other Entity/Ecosphere"
+
+# Matt Johnson - TNC
+rangewide_files_path = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/YBCU - Rangewide Surveys CSWG/Other Entity Data/NM Other Entity/Matt Johnson - TNC"
+
+# Sevilleta NWR
+rangewide_files_path = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/YBCU - Rangewide Surveys CSWG/Other Entity Data/NM Other Entity/Sevilleta NWR"
+
 
 file.list = list.files(path = rangewide_files_path, pattern='*.xlsx')
 path.list = file.path(rangewide_files_path, file.list)
