@@ -232,28 +232,38 @@ Since we did not count territories, I checked to see if svdets and COBPRB are co
 plot(detAll$svdets, detAll$COBPRB)
 cor.test(detAll$svdets, detAll$COBPRB)
 detTerr.lm = lm(detAll$COBPRB~detAll$svdets)
+summary(detTerr.lm)
 abline(detTerr.lm)
 # predictions between 1-102
 detTerr.lm.pred = predict(detTerr.lm)
+
+plot((detAll$svdets / detAll$ha), detAll$COBPRB)
+cor.test((detAll$svdets / detAll$ha), detAll$COBPRB)
+dphTerr.lm = lm(detAll$COBPRB~(detAll$svdets / detAll$ha))
+summary(dphTerr.lm)
+abline(dphTerr.lm)
+# predictions between 1-102
+dphTerr.lm.pred = predict(dphTerr.lm)
 
 ## Rerescaling of cha2 variable leads to exact same results and removes warnings,
 #     but rescaling adds difficulty in interpreting results, analyzed as w/o rescaling as the results are the same either way
 # I think I have some other version of the scale command loaded
 # detAll$cha3 = scale(detAll$cha2)
-detAll$cha3 = (detAll$cha2 - mean(detAll$cha2)) / sd(detAll$cha2)
+# detAll$cha3 = (detAll$cha2 - mean(detAll$cha2)) / sd(detAll$cha2)
+detAll$ha1 = (detAll$ha - mean(detAll$ha)) / sd(detAll$ha)
 
 #data visualization plot - AED functions used here
 Z = cbind(detAll$svdets, # potential response variable
            detAll$dph, # potential response variable
            detAll$Year, # potential predictor variables
            detAll$ha, # potential predictor variables
-           detAll$Age, # potential predictor variables
-           detAll$cha2, # potential predictor variables
-           detAll$cha3, # potential predictor variables
-           detAll$nAges,# potential predictor variables
-           detAll$youngest)# potential predictor variables
-colnames(Z) = c("svdets", "dph", "Year", "ha", "Age", "cha2", "cha3",
-               "nAges", "youngest")  # no spaces in col names
+           detAll$Age) # potential predictor variables
+           # detAll$cha2, # potential predictor variables
+           # detAll$cha3, # potential predictor variables
+           # detAll$nAges,# potential predictor variables
+           # detAll$youngest)# potential predictor variables
+colnames(Z) = c("svdets", "dph", "Year", "ha", "Age") #, "cha2", "cha3",
+               # "nAges", "youngest")  # no spaces in col names
 pairs(Z, lower.panel=panel.smooth2,upper.panel=panel.cor,diag.panel=panel.hist);    #pairwise scatterplots and correlation coefficients to examine for colinearity
 
 #check for correlation and VIF - A VIF less than 3 is good. 
@@ -263,57 +273,102 @@ corvif(Z[,c(-1, -2, -6, -9)])   # from AED script file, gets correlation coeffic
 # These are equivalent of R4, R10, R2, R1, and R9 using COBPRB and pre-2019 data
 #   So R35 is global model and removing items did not improve AIC
 R32  = glmer(svdets ~ ha + Age +(1|Site)+(1|Year), data = detAll, family = poisson)
-R33  = glmer(svdets ~ ha + Age + nAges +(1|Site) +(1|Year), data = detAll, family = poisson)
-R34  = glmer(svdets ~ ha + Age + cha3 + nAges +(1|Site)+(1|Year), data = detAll, family = poisson)
-R35  = glmer(svdets ~ ha + Age + cha3 + nAges + youngest +(1|Site)+(1|Year), data = detAll, family = poisson)
-R36  = glmer(svdets ~ ha + Age + nAges + youngest +(1|Site)+(1|Year), data = detAll, family = poisson)
+R42  = glmer(svdets ~ ha + (1|Site)+(1|Year), data = detAll, family = poisson)
+R43  = glmer(svdets ~ Age +(1|Site)+(1|Year), data = detAll, family = poisson)
 
-models = list("R32" = R32, "R33" = R33, "R34" = R34, "R35" = R35, "R36" = R36)
+R44  = glmer.nb(svdets ~ ha + Age +(1|Site)+(1|Year), data = detAll, family = )
+R45  = glmer.nb(svdets ~ ha + (1|Site)+(1|Year), data = detAll, family = poisson)
+R46  = glmer.nb(svdets ~ Age +(1|Site)+(1|Year), data = detAll, family = poisson)
+# this did not converge
+R47  = glmer.nb(svdets ~ ha + Age + ha:Age +(1|Site)+(1|Year), data = detAll, family = )
+R48  = glmer.nb(svdets ~ ha1 + Age + ha1:Age +(1|Site)+(1|Year), data = detAll, family = )
+R49  = glmer.nb(svdets ~ ha1 + (1|Site)+(1|Year), data = detAll, family = poisson)
+# R33  = glmer(svdets ~ ha + Age + nAges +(1|Site) +(1|Year), data = detAll, family = poisson)
+# R34  = glmer(svdets ~ ha + Age + cha3 + nAges +(1|Site)+(1|Year), data = detAll, family = poisson)
+# R35  = glmer(svdets ~ ha + Age + cha3 + nAges + youngest +(1|Site)+(1|Year), data = detAll, family = poisson)
+# R36  = glmer(svdets ~ ha + Age + nAges + youngest +(1|Site)+(1|Year), data = detAll, family = poisson)
 
+models = list("R32" = R32, "R42" = R42, "R43" = R43) #, "R33" = R33, "R34" = R34, "R35" = R35, "R36" = R36)
+models.nb = list("R44" = R44, "R45" = R45, "R46" = R46)
+models.nb = list("R48" = R48, "R49" = R49, "R46" = R46)
 # Display a table of Model#, AIC, delta AIC, & Akaike wt
 aictab(models)
+aictab(models.nb)
 
-summary(R35)
+# replacing R35 with R32 for now just to get this done
+summary(R32)
+summary(R44)
+summary(R48)
+
 #Residuals look pretty good
-qqnorm(residuals(R35))
+qqnorm(residuals(R32))
+qqnorm(residuals(R44))
+qqnorm(residuals(R48))
 
-#Overdispersion result from model 35: 1.949482 greater than 1, so overdispersion
-E1 <- residuals(R35)
-p1 <- length(fixef(R35)) + 1
+#Overdispersion result from model 35: 1.923856 greater than 1, so overdispersion
+E1 <- residuals(R32)
+p1 <- length(fixef(R32)) + 1
 (Overdisp1 <- sum(E1^2) / (nrow(detAll) - p1))
 
+# 1.148619
+E1nb <- residuals(R48)
+p1nb <- length(fixef(R48)) + 1
+(Overdisp1nb <- sum(E1nb^2) / (nrow(detAll) - p1nb))
+
 #Checking for Deviance Residual GOF, a check for overdispersion
-(phi <- sum(resid(R35, type = "pearson")^2) / df.residual(R35))
-# 1.77147 -  data is overdispersed
+(phi <- sum(resid(R32, type = "pearson")^2) / df.residual(R32))
+# 1.714546 -  data is overdispersed
+(phinb <- sum(resid(R48, type = "pearson")^2) / df.residual(R48))
+# 0.9230442 -  data is overdispersed
 
 #Residual diagnostic plots
 op <- par(mfrow=c(2,3),mar=c(5,4,1,2))
-E<-resid(R35)
-fit <-fitted(R35)
+E<-resid(R32)
+fit <-fitted(R32)
+hist(E,xlab="Residuals",main="")   #histogram to check for normality
+qqnorm(E)                           #QQ plot to check for normality
+plot(fit,E, main="Residuals vs. Fitted Values", ylab="Residual", xlab="Fitted values")    #fitted vs residuals to check homogenaity/heteroskedacity - look for patterns
+plot(detAll$ha1,E,xlab="ha",ylab="Residuals")                  #residuals vs each explanatory variable to check for independence
+plot(detAll$Age,E,xlab="age",ylab="Residuals")                #residuals vs each explanatory variable to check for independence
+# plot(detAll$nAge,E,xlab="n age",ylab="Residuals")             #residuals vs each explanatory variable to check for independence
+par(op)
+
+# Looking at the various intercept values for random effect variables
+coef(R32)
+coefs <-coef(R32)$Site[,"(Intercept)"]
+plot(coefs)
+boxplot(coefs)
+
+coefs <-coef(R32)$Year[,"(Intercept)"]
+plot(coefs)
+boxplot(coefs)
+
+op <- par(mfrow=c(2,3),mar=c(5,4,1,2))
+E<-resid(R48)
+fit <-fitted(R48)
 hist(E,xlab="Residuals",main="")   #histogram to check for normality
 qqnorm(E)                           #QQ plot to check for normality
 plot(fit,E, main="Residuals vs. Fitted Values", ylab="Residual", xlab="Fitted values")    #fitted vs residuals to check homogenaity/heteroskedacity - look for patterns
 plot(detAll$ha,E,xlab="ha",ylab="Residuals")                  #residuals vs each explanatory variable to check for independence
 plot(detAll$Age,E,xlab="age",ylab="Residuals")                #residuals vs each explanatory variable to check for independence
-plot(detAll$nAge,E,xlab="n age",ylab="Residuals")             #residuals vs each explanatory variable to check for independence
+# plot(detAll$nAge,E,xlab="n age",ylab="Residuals")             #residuals vs each explanatory variable to check for independence
 par(op)
 
 # Looking at the various intercept values for random effect variables
-coef(R35)
-coefs <-coef(R35)$Site[,"(Intercept)"]
+coef(R48)
+coefs <-coef(R44)$Site[,"(Intercept)"]
 plot(coefs)
 boxplot(coefs)
 
-coefs <-coef(R35)$Year[,"(Intercept)"]
+coefs <-coef(R48)$Year[,"(Intercept)"]
 plot(coefs)
 boxplot(coefs)
-
-
 # 
-plot_model(R35, type = "pred", terms = c("Age", "ha"))
-plot_model(R35, type = "pred", terms = c("Age", "cha3"))
-plot_model(R35, type = "pred", terms = c("Age", "nAges"))
-plot_model(R35, type = "pred", terms = c("Age", "youngest"))
+plot_model(R32, type = "pred", terms = c("Age", "ha"))
+plot_model(R48, type = "pred", terms = c("Age", "ha1"))
+# plot_model(R32, type = "pred", terms = c("Age", "cha3"))
+# plot_model(R32, type = "pred", terms = c("Age", "nAges"))
+# plot_model(R32, type = "pred", terms = c("Age", "youngest"))
 ```
 
 ## Detections per hectare
@@ -323,59 +378,60 @@ Uses lmer not glmer, since it says you should when you try to use more appropria
 ```{r dph}
 R37  = lmer(dph ~ Age + (1|Site) + (1|Year), 
            data = detAll)
-R38  = lmer(dph ~ Age + nAges + (1|Site) + (1|Year), 
-             data = detAll)
-R39  = lmer(dph ~ Age + cha3 + nAges + (1|Site) + (1|Year), 
-             data = detAll)
-R40  = lmer(dph ~ Age + cha3 + nAges + youngest + (1|Site) + (1|Year), 
-             data = detAll)
-R41  = lmer(dph ~ Age + nAges + youngest + (1|Site) + (1|Year), 
-             data = detAll)
+# R38  = lmer(dph ~ Age + nAges + (1|Site) + (1|Year), 
+#              data = detAll)
+# R39  = lmer(dph ~ Age + cha3 + nAges + (1|Site) + (1|Year), 
+#              data = detAll)
+# R40  = lmer(dph ~ Age + cha3 + nAges + youngest + (1|Site) + (1|Year), 
+#              data = detAll)
+# R41  = lmer(dph ~ Age + nAges + youngest + (1|Site) + (1|Year), 
+#              data = detAll)
 
-models_dph = c("R37" = R37, "R38" = R38, "R39" = R39, "R40" = R40, "R41" = R41)
+models_dph = c("R37" = R37)#, "R38" = R38, "R39" = R39, "R40" = R40, "R41" = R41)
 
 # Display a table of Model#, AIC, delta AIC, & Akaike wt
-aictab(models_dph)
+# aictab(models_dph)
 
-summary(R39)
+# Changing all to simplest model from here on
+summary(R37)
 #Residuals look pretty good
-qqnorm(residuals(R39))
+qqnorm(residuals(R37))
 
-#Overdispersion result from model 39: 0.02020889 less than 1, so underdispersion
-E1 <- residuals(R39)
-p1 <- length(fixef(R39)) + 1
+#Overdispersion result from model 39: 0.01645217 less than 1, so underdispersion
+E1 <- residuals(R37)
+p1 <- length(fixef(R37)) + 1
 (Overdisp1 <- sum(E1^2) / (nrow(detAll) - p1))
 
 
 #Checking for Deviance Residual GOF, a check for overdispersion
-(phi <- sum(resid(R39, type = "pearson")^2) / df.residual(R39))
-# 0.02046309 -  data is underdispersed
+(phi <- sum(resid(R37, type = "pearson")^2) / df.residual(R37))
+# 0.01663913 -  data is underdispersed
 
 #Residual diagnostic plots
 op <- par(mfrow=c(2,3),mar=c(5,4,1,2))
-E<-resid(R39)
-fit <-fitted(R39)
+E<-resid(R37)
+fit <-fitted(R37)
 hist(E,xlab="Residuals",main="")   #histogram to check for normality
 qqnorm(E)                           #QQ plot to check for normality
 plot(fit,E, main="Residuals vs. Fitted Values", ylab="Residual", xlab="Fitted values")    #fitted vs residuals to check homogenaity/heteroskedacity - look for patterns
 plot(detAll$Age,E,xlab="age",ylab="Residuals")                #residuals vs each explanatory variable to check for independence
-plot(detAll$nAge,E,xlab="n age",ylab="Residuals")             #residuals vs each explanatory variable to check for independence
+# plot(detAll$nAge,E,xlab="n age",ylab="Residuals")             #residuals vs each explanatory variable to check for independence
 par(op)
 
 # Looking at the various intercept values for random effect variables
-coef(R39)
-coefs <-coef(R39)$Site[,"(Intercept)"]
+coef(R37)
+coefs <-coef(R37)$Site[,"(Intercept)"]
 plot(coefs)
 boxplot(coefs)
 
-coefs <-coef(R39)$Year[,"(Intercept)"]
+coefs <-coef(R37)$Year[,"(Intercept)"]
 plot(coefs)
 boxplot(coefs)
 
 
 # 
-plot_model(R39, type = "pred", terms = c("Age", "cha3"))
-plot_model(R39, type = "pred", terms = c("Age", "nAges"))
+plot_model(R37, type = "pred", terms = c("Age"))
+# plot_model(R39, type = "pred", terms = c("Age", "nAges"))
 
 
 ```
