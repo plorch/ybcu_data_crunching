@@ -1336,6 +1336,12 @@ pt21_sbsp = pt21_sitebysvperiod %>%
   tibble::rownames_to_column("loccode1922")
 pt22_sbsp = pt22_sitebysvperiod %>%
   tibble::rownames_to_column("loccode1922")
+
+write.csv(pt19_sbsp, "pt19_sbsp.csv")
+write.csv(pt20_sbsp, "pt20_sbsp.csv")
+write.csv(pt21_sbsp, "pt21_sbsp.csv")
+write.csv(pt22_sbsp, "pt22_sbsp.csv")
+
   
 count1922_sitebysvperiod_list = 
   list(pt19_sbsp,
