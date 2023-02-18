@@ -105,6 +105,10 @@ hist(det$nAges, labels = TRUE, main = "nAges")
 hist(det$COBPRB, labels = TRUE, main = "COBPRB")
 boxplot(det$COBPRB)
 
+pt19_sbsp = read.csv("pt19_sbsp.csv")[,-1]
+pt20_sbsp = read.csv("pt20_sbsp.csv")[,-1]
+pt21_sbsp = read.csv("pt21_sbsp.csv")[,-1]
+pt22_sbsp = read.csv("pt22_sbsp.csv")[,-1]
 ```
 
 
@@ -230,6 +234,8 @@ Since we did not count territories, I checked to see if svdets and COBPRB are co
 
 Model 44 had overdispersed residuals, which indicated that a poisson model was inappropriate.  Rather than square root transform the detection counts as in the 2018 report, we just redid the model using negative binomial.
 
+Area has a disjunct distribution (bimodal).  This caused problems with model convergence so we scale the area (ha) to a mean of zero with variance of +- 1 SD.
+
 ```{r detections}
 plot(detAll$svdets, detAll$COBPRB)
 cor.test(detAll$svdets, detAll$COBPRB)
@@ -314,6 +320,17 @@ coefs <-coef(R48)$Year[,"(Intercept)"]
 plot(coefs)
 boxplot(coefs)
 
-plot_model(R48, type = "pred", terms = c("Age", "ha1"))
+plot_model(R48, 
+           type = "pred", 
+           terms = c("Age", "ha1"),
+           legend.title = "Area (scaled)",
+           axis.title = c("Age (years since planting)", "Survey detections"))
+plot_model(R48, 
+           type = "pred", colors = "bw",
+           terms = c("Age", "ha1"),
+           legend.title = "Area (scaled)",
+           axis.title = c("Age (years since planting)", "Survey detections"))
+
+
 ```
 
