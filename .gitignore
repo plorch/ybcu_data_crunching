@@ -9,3 +9,5 @@ unmarked_dynamic_example/
 connect.R
 *.pdf
 *.png
+*.html
+*.zip
