@@ -331,6 +331,28 @@ plot_model(R48,
            legend.title = "Area (scaled)",
            axis.title = c("Age (years since planting)", "Survey detections"))
 
+# backtransform ha1 for plot
+descale_ha = function(x){
+  x * sd(detAll$ha) + mean(detAll$ha)
+}
 
+pretty = (c(20,50,80) - mean(detAll$ha)) / sd(detAll$ha)
+
+p = plot_model(R48, 
+           type = "pred", colors = "bw",
+           terms = c("Age", 
+                     "ha1[-0.8382141, 0.4280929, 1.6944]"),
+           title = "Survey Detections by Site Age/Size",
+           legend.title = "Area (ha)",
+           axis.title = c("Age (years since planting)", "Survey detections"))
+
+p = p + scale_linetype_manual(
+  values = c(1:3),
+  labels = c("20", "50","80"))
+p
+ggsave(path =
+         "LCR_YBCU_DetectionModelFinalReport",
+       "svdets_age_effects_plot_bw.jpg",
+       width = 7, height = 3.5, units = "in")
 ```
 
