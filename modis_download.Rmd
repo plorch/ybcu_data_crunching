@@ -9,6 +9,13 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## Initial tests
+
+This file is out of date.  I started a separate project for this item here:
+
+* C:\Users\PatrickLorch\SSRS\Southern Sierra Research Station - Documents\Projects\krv_riparian_change
+
+
 ## Using MODISTools
 
 
